@@ -7,6 +7,7 @@ import { UsersModule } from '../users/users.module.js';
 import { PeliculasModule } from '../peliculas/peliculas.module.js';
 import { FuncionesModule } from '../funciones/funciones.module.js';
 import { SucursalesModule } from '../sucursales/sucursales.module.js';
+import { ProductosModule } from '../productos/productos.module.js';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { SucursalesModule } from '../sucursales/sucursales.module.js';
     PeliculasModule,
     FuncionesModule,
     SucursalesModule,
+    ProductosModule,
   ],
   controllers: [AppController],
   providers: [AppService],
