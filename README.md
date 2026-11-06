@@ -39,14 +39,16 @@ Antes de levantar el servidor hay que crear el archivo `.env` (ver la sección s
 Se guardan en un archivo `.env` en la raíz del proyecto, que **no se sube a GitHub**: figura en el `.gitignore`. El repositorio no incluye ningún archivo con credenciales, ni siquiera de ejemplo. Hay que crearlo a mano con este contenido:
 
 ```
-PORT=3100
-DATABASE_URL="postgresql://usuario:contrasena@localhost:5432/cine_tucuman?schema=public"
+PORT=4000
+DATABASE_URL=postgresql://usuario:password@localhost:5432/cine_tucuman
+API_BASE_URL=http://localhost:4000/
 ```
 
 | Variable | Qué guarda |
 |---|---|
-| `PORT` | El puerto donde escucha la API |
-| `DATABASE_URL` | La conexión a PostgreSQL que usará Prisma |
+| `PORT` | El puerto donde escucha la API (si falta, usa el 4000) |
+| `DATABASE_URL` | La conexión a la base de datos PostgreSQL: usuario, contraseña, servidor, puerto y nombre |
+| `API_BASE_URL` | La dirección base de la API, que se muestra al arrancar |
 
 El archivo lo lee `ConfigModule` de `@nestjs/config`, que se registra una sola vez en `AppModule` y queda disponible en todo el proyecto.
 
