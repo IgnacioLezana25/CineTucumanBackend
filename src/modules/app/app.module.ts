@@ -8,6 +8,7 @@ import { PeliculasModule } from '../peliculas/peliculas.module.js';
 import { FuncionesModule } from '../funciones/funciones.module.js';
 import { SucursalesModule } from '../sucursales/sucursales.module.js';
 import { ProductosModule } from '../productos/productos.module.js';
+import { OrdenesModule } from '../ordenes/ordenes.module.js';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ProductosModule } from '../productos/productos.module.js';
     FuncionesModule,
     SucursalesModule,
     ProductosModule,
+    OrdenesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
