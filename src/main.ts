@@ -1,3 +1,4 @@
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './modules/app/app.module.js';
@@ -9,6 +10,7 @@ async function bootstrap() {
   const configuracion = app.get(ConfigService);
   const puerto = configuracion.get<number>('PORT') ?? PUERTO_POR_DEFECTO;
 
+  app.useGlobalPipes(new ValidationPipe());
   await app.listen(puerto);
 }
 await bootstrap();
