@@ -21,7 +21,18 @@ const peliculaEnBase = {
   director: null,
   paisOrigen: null,
   clasificacion: { id: 1, nombre: 'ATP' },
-  generos: [{ peliculaId: 1, generoId: 4, genero: { id: 4, nombre: 'Animación' } }],
+  generos: [
+    { peliculaId: 1, generoId: 4, genero: { id: 4, nombre: 'Animación' } },
+  ],
+  reparto: [
+    {
+      peliculaId: 1,
+      orden: 1,
+      nombre: 'Tom Hanks',
+      fotoArchivo: 'tom-hanks.jpg',
+    },
+    { peliculaId: 1, orden: 2, nombre: 'Tim Allen', fotoArchivo: null },
+  ],
 };
 
 const cuerpoValido = {
@@ -74,12 +85,24 @@ describe('Peliculas (e2e)', () => {
       fechaEstreno: '2026-07-30',
       generos: ['Animación'],
       posterUrl: 'http://localhost:4000/imagenes/peliculas/toy-story-5.jpg',
+      reparto: [
+        {
+          nombre: 'Tom Hanks',
+          fotoArchivo: 'tom-hanks.jpg',
+          fotoUrl: 'http://localhost:4000/imagenes/reparto/tom-hanks.jpg',
+        },
+        { nombre: 'Tim Allen', fotoArchivo: null, fotoUrl: null },
+      ],
     });
-    expect(pelicula.findMany.mock.calls[0][0].where.estado).toBe('en-cartelera');
+    expect(pelicula.findMany.mock.calls[0][0].where.estado).toBe(
+      'en-cartelera',
+    );
   });
 
   it('GET /peliculas con un estado inválido responde 400', async () => {
-    await request(app.getHttpServer()).get('/peliculas?estado=otra').expect(400);
+    await request(app.getHttpServer())
+      .get('/peliculas?estado=otra')
+      .expect(400);
     expect(pelicula.findMany).not.toHaveBeenCalled();
   });
 
@@ -130,6 +153,59 @@ describe('Peliculas (e2e)', () => {
     expect(datos.sinopsis).toBeNull();
   });
 
+  it('POST /peliculas con reparto lo guarda numerado en el orden recibido', async () => {
+    pelicula.create.mockResolvedValue(peliculaEnBase);
+
+    await request(app.getHttpServer())
+      .post('/peliculas')
+      .send({
+        ...cuerpoValido,
+        reparto: [
+          { nombre: 'Tom Hanks', fotoArchivo: 'tom-hanks.jpg' },
+          { nombre: 'Tim Allen' },
+        ],
+      })
+      .expect(201);
+
+    expect(pelicula.create.mock.calls[0][0].data.reparto).toEqual({
+      create: [
+        { orden: 1, nombre: 'Tom Hanks', fotoArchivo: 'tom-hanks.jpg' },
+        { orden: 2, nombre: 'Tim Allen', fotoArchivo: null },
+      ],
+    });
+  });
+
+  it('POST /peliculas sin reparto guarda una lista vacía', async () => {
+    pelicula.create.mockResolvedValue(peliculaEnBase);
+
+    await request(app.getHttpServer())
+      .post('/peliculas')
+      .send(cuerpoValido)
+      .expect(201);
+
+    expect(pelicula.create.mock.calls[0][0].data.reparto).toEqual({
+      create: [],
+    });
+  });
+
+  it('POST /peliculas con reparto inválido responde 400', async () => {
+    const repartosInvalidos = [
+      [{ nombre: '' }],
+      [{ nombre: 'Tom Hanks' }, { nombre: 'Tom Hanks' }],
+      [{ fotoArchivo: 'sin-nombre.jpg' }],
+      'Tom Hanks',
+    ];
+
+    for (const reparto of repartosInvalidos) {
+      await request(app.getHttpServer())
+        .post('/peliculas')
+        .send({ ...cuerpoValido, reparto })
+        .expect(400);
+    }
+
+    expect(pelicula.create).not.toHaveBeenCalled();
+  });
+
   it('POST /peliculas con un slug repetido responde 409', async () => {
     pelicula.create.mockRejectedValue({ code: 'P2002' });
 
@@ -169,6 +245,33 @@ describe('Peliculas (e2e)', () => {
 
     expect(datos.titulo).toBeUndefined();
     expect(datos.sinopsis).toBeNull();
+  });
+
+  it('PATCH /peliculas/:id con reparto lo reemplaza y con una lista vacía lo borra', async () => {
+    pelicula.update.mockResolvedValue(peliculaEnBase);
+
+    await request(app.getHttpServer())
+      .patch('/peliculas/1')
+      .send({ reparto: [{ nombre: 'Tim Allen' }] })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch('/peliculas/1')
+      .send({ reparto: [] })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch('/peliculas/1')
+      .send({ titulo: 'Nuevo' })
+      .expect(200);
+
+    expect(pelicula.update.mock.calls[0][0].data.reparto).toEqual({
+      deleteMany: {},
+      create: [{ orden: 1, nombre: 'Tim Allen', fotoArchivo: null }],
+    });
+    expect(pelicula.update.mock.calls[1][0].data.reparto).toEqual({
+      deleteMany: {},
+      create: [],
+    });
+    expect(pelicula.update.mock.calls[2][0].data.reparto).toBeUndefined();
   });
 
   it('DELETE /peliculas/:id con funciones responde 409', async () => {
