@@ -1345,7 +1345,7 @@
     },
     {
       "name": "sucursales",
-      "description": "Módulo sucursales (sucursales). Las cinco rutas las generó nest g resource; por ahora devuelven un texto de ejemplo y todavía no se conectan a la base de datos.",
+      "description": "Módulo sucursales, conectado a la base de datos con Prisma. Ejecutar la carpeta completa en orden: «Crear una sucursal» guarda el id en la variable sucursalId, que usan las siguientes, y «Eliminar la sucursal creada» la borra. Las peticiones «Error: …» comprueban los códigos 400, 404 y 409.",
       "item": [
         {
           "name": "Listar sucursales",
@@ -1370,6 +1370,13 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Trae la ciudad, la imagen y los enlaces\", function () {",
+                  "  const sucursales = pm.response.json();",
+                  "  pm.expect(sucursales).to.be.an(\"array\").that.is.not.empty;",
+                  "  pm.expect(sucursales[0].ciudad).to.be.a(\"string\");",
+                  "  pm.expect(sucursales[0].imagenUrl).to.include(\"/imagenes/sucursales/\");",
+                  "  pm.expect(sucursales[0].enlaces).to.be.an(\"array\");",
                   "});"
                 ]
               }
@@ -1378,7 +1385,46 @@
           "response": []
         },
         {
-          "name": "Ver un registro de sucursales",
+          "name": "Listar sucursales destacadas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sucursales?destacada=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sucursales"
+              ],
+              "query": [
+                {
+                  "key": "destacada",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Todas son destacadas\", function () {",
+                  "  pm.response.json().forEach((sucursal) => pm.expect(sucursal.destacada).to.eql(true));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Ver una sucursal por id",
           "request": {
             "method": "GET",
             "header": [],
@@ -1401,6 +1447,9 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Es la sucursal pedida\", function () {",
+                  "  pm.expect(pm.response.json().id).to.eql(1);",
                   "});"
                 ]
               }
@@ -1409,7 +1458,42 @@
           "response": []
         },
         {
-          "name": "Crear en sucursales",
+          "name": "Ver una sucursal por slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sucursales/slug/sunstar-cinemas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sucursales",
+                "slug",
+                "sunstar-cinemas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Es la sucursal pedida\", function () {",
+                  "  pm.expect(pm.response.json().slug).to.eql(\"sunstar-cinemas\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Crear una sucursal",
           "request": {
             "method": "POST",
             "header": [
@@ -1429,7 +1513,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{}",
+              "raw": "{\n  \"slug\": \"sucursal-{{$timestamp}}\",\n  \"nombre\": \"Sucursal de prueba\",\n  \"ciudadId\": 1,\n  \"direccion\": \"Calle de prueba 123\",\n  \"descripcion\": \"Sucursal creada desde Postman.\",\n  \"imagenArchivo\": \"sunstar-cinemas.jpg\",\n  \"destacada\": false,\n  \"enlaces\": [\n    {\n      \"tipo\": \"sitio\",\n      \"url\": \"https://www.ejemplo.com.ar/\"\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1445,6 +1529,11 @@
                 "exec": [
                   "pm.test(\"Responde 201\", function () {",
                   "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Guarda el id y devuelve sus enlaces\", function () {",
+                  "  const sucursal = pm.response.json();",
+                  "  pm.expect(sucursal.enlaces).to.have.lengthOf(1);",
+                  "  pm.collectionVariables.set(\"sucursalId\", sucursal.id);",
                   "});"
                 ]
               }
@@ -1453,7 +1542,7 @@
           "response": []
         },
         {
-          "name": "Actualizar en sucursales",
+          "name": "Actualizar una sucursal",
           "request": {
             "method": "PATCH",
             "header": [
@@ -1463,18 +1552,18 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/sucursales/1",
+              "raw": "{{baseUrl}}/sucursales/{{sucursalId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "sucursales",
-                "1"
+                "{{sucursalId}}"
               ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{}",
+              "raw": "{\n  \"nombre\": \"Sucursal editada\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1490,6 +1579,11 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Cambia solo lo enviado\", function () {",
+                  "  const sucursal = pm.response.json();",
+                  "  pm.expect(sucursal.nombre).to.eql(\"Sucursal editada\");",
+                  "  pm.expect(sucursal.enlaces).to.have.lengthOf(1);",
                   "});"
                 ]
               }
@@ -1498,18 +1592,304 @@
           "response": []
         },
         {
-          "name": "Eliminar de sucursales",
+          "name": "Reemplazar los enlaces de una sucursal",
           "request": {
-            "method": "DELETE",
-            "header": [],
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{baseUrl}}/sucursales/1",
+              "raw": "{{baseUrl}}/sucursales/{{sucursalId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "sucursales",
-                "1"
+                "{{sucursalId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enlaces\": [\n    {\n      \"tipo\": \"instagram\",\n      \"url\": \"https://www.instagram.com/ejemplo/\"\n    },\n    {\n      \"tipo\": \"facebook\",\n      \"url\": \"https://www.facebook.com/ejemplo/\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Quedan los enlaces nuevos\", function () {",
+                  "  pm.expect(pm.response.json().enlaces.map((enlace) => enlace.tipo)).to.eql([\"facebook\", \"instagram\"]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con un enlace sin https (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sucursales",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sucursales"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"enlace-invalido\",\n  \"nombre\": \"Sucursal\",\n  \"ciudadId\": 1,\n  \"direccion\": \"Calle 1\",\n  \"enlaces\": [\n    {\n      \"tipo\": \"sitio\",\n      \"url\": \"ejemplo.com\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear sin nombre (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sucursales",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sucursales"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"sin-nombre\",\n  \"ciudadId\": 1,\n  \"direccion\": \"Calle 1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con una ciudad inexistente (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sucursales",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sucursales"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"sin-ciudad\",\n  \"nombre\": \"Sucursal\",\n  \"ciudadId\": 999,\n  \"direccion\": \"Calle 1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con un slug repetido (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sucursales",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sucursales"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"sunstar-cinemas\",\n  \"nombre\": \"Repetida\",\n  \"ciudadId\": 1,\n  \"direccion\": \"Calle 1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: sucursal inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sucursales/99999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sucursales",
+                "99999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: eliminar una sucursal con funciones (409)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sucursales/4",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sucursales",
+                "4"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Eliminar la sucursal creada",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sucursales/{{sucursalId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sucursales",
+                "{{sucursalId}}"
               ]
             }
           },
@@ -1521,6 +1901,40 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Devuelve la sucursal eliminada\", function () {",
+                  "  pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"sucursalId\")));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: eliminar de nuevo (404)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sucursales/{{sucursalId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sucursales",
+                "{{sucursalId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () {",
+                  "  pm.response.to.have.status(404);",
                   "});"
                 ]
               }
@@ -1532,7 +1946,7 @@
     },
     {
       "name": "productos",
-      "description": "Módulo productos (productos del Candy Bar). Las cinco rutas las generó nest g resource; por ahora devuelven un texto de ejemplo y todavía no se conectan a la base de datos.",
+      "description": "Módulo productos, conectado a la base de datos con Prisma. Ejecutar la carpeta completa en orden: «Crear un producto» guarda el id en la variable productoId, que usan las siguientes, y «Eliminar el producto creado» lo borra. Las peticiones «Error: …» comprueban los códigos 400, 404 y 409.",
       "item": [
         {
           "name": "Listar productos",
@@ -1557,6 +1971,11 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Devuelve el precio como número\", function () {",
+                  "  const productos = pm.response.json();",
+                  "  pm.expect(productos).to.be.an(\"array\").that.is.not.empty;",
+                  "  pm.expect(productos[0].precio).to.be.a(\"number\");",
                   "});"
                 ]
               }
@@ -1565,7 +1984,85 @@
           "response": []
         },
         {
-          "name": "Ver un registro de productos",
+          "name": "Listar productos por categoria",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos?categoria=combo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ],
+              "query": [
+                {
+                  "key": "categoria",
+                  "value": "combo"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Todos son combos\", function () {",
+                  "  pm.response.json().forEach((producto) => pm.expect(producto.categoria).to.eql(\"combo\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Listar productos activos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos?activo=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ],
+              "query": [
+                {
+                  "key": "activo",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Todos están activos\", function () {",
+                  "  pm.response.json().forEach((producto) => pm.expect(producto.activo).to.eql(true));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Ver un producto por id",
           "request": {
             "method": "GET",
             "header": [],
@@ -1588,6 +2085,9 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Es el producto pedido\", function () {",
+                  "  pm.expect(pm.response.json().id).to.eql(1);",
                   "});"
                 ]
               }
@@ -1596,7 +2096,42 @@
           "response": []
         },
         {
-          "name": "Crear en productos",
+          "name": "Ver un producto por slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/slug/combo-clasico",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "slug",
+                "combo-clasico"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Es el producto pedido\", function () {",
+                  "  pm.expect(pm.response.json().slug).to.eql(\"combo-clasico\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Crear un producto",
           "request": {
             "method": "POST",
             "header": [
@@ -1616,7 +2151,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{}",
+              "raw": "{\n  \"slug\": \"producto-{{$timestamp}}\",\n  \"nombre\": \"Producto de prueba\",\n  \"descripcion\": \"Producto creado desde Postman.\",\n  \"categoria\": \"snack\",\n  \"precio\": 1234.5,\n  \"activo\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1632,6 +2167,11 @@
                 "exec": [
                   "pm.test(\"Responde 201\", function () {",
                   "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Guarda el id para las siguientes peticiones\", function () {",
+                  "  const producto = pm.response.json();",
+                  "  pm.expect(producto.precio).to.eql(1234.5);",
+                  "  pm.collectionVariables.set(\"productoId\", producto.id);",
                   "});"
                 ]
               }
@@ -1640,7 +2180,7 @@
           "response": []
         },
         {
-          "name": "Actualizar en productos",
+          "name": "Actualizar un producto",
           "request": {
             "method": "PATCH",
             "header": [
@@ -1650,18 +2190,18 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/productos/1",
+              "raw": "{{baseUrl}}/productos/{{productoId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "productos",
-                "1"
+                "{{productoId}}"
               ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{}",
+              "raw": "{\n  \"precio\": 2000,\n  \"activo\": false\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1677,6 +2217,12 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Cambia solo lo enviado\", function () {",
+                  "  const producto = pm.response.json();",
+                  "  pm.expect(producto.precio).to.eql(2000);",
+                  "  pm.expect(producto.activo).to.eql(false);",
+                  "  pm.expect(producto.categoria).to.eql(\"snack\");",
                   "});"
                 ]
               }
@@ -1685,7 +2231,258 @@
           "response": []
         },
         {
-          "name": "Eliminar de productos",
+          "name": "Error: crear con un precio negativo (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"precio-negativo\",\n  \"nombre\": \"Producto\",\n  \"categoria\": \"snack\",\n  \"precio\": -5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con texto en el precio (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"precio-texto\",\n  \"nombre\": \"Producto\",\n  \"categoria\": \"snack\",\n  \"precio\": \"barato\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con una categoria inexistente (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"categoria-invalida\",\n  \"nombre\": \"Producto\",\n  \"categoria\": \"postre\",\n  \"precio\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con un activo que no es true o false (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"activo-invalido\",\n  \"nombre\": \"Producto\",\n  \"categoria\": \"snack\",\n  \"precio\": 5,\n  \"activo\": \"si\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con un slug repetido (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"combo-clasico\",\n  \"nombre\": \"Repetido\",\n  \"categoria\": \"combo\",\n  \"precio\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: producto inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/99999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "99999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: eliminar un producto que figura en órdenes (409)",
           "request": {
             "method": "DELETE",
             "header": [],
@@ -1706,8 +2503,183 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "pm.test(\"Responde 409\", function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Eliminar el producto creado",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{productoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{productoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Devuelve el producto eliminado\", function () {",
+                  "  pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"productoId\")));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: eliminar de nuevo (404)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{productoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{productoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "catalogos",
+      "description": "Listas de solo lectura de géneros, clasificaciones y ciudades, para armar los formularios.",
+      "item": [
+        {
+          "name": "Listar generos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/catalogos/generos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "catalogos",
+                "generos"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Cada género tiene id y nombre\", function () {",
+                  "  const generos = pm.response.json();",
+                  "  pm.expect(generos).to.be.an(\"array\").that.is.not.empty;",
+                  "  pm.expect(generos[0]).to.have.all.keys(\"id\", \"nombre\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Listar clasificaciones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/catalogos/clasificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "catalogos",
+                "clasificaciones"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Cada clasificación tiene id y nombre\", function () {",
+                  "  pm.expect(pm.response.json()[0]).to.have.all.keys(\"id\", \"nombre\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Listar ciudades",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/catalogos/ciudades",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "catalogos",
+                "ciudades"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Cada ciudad tiene provincia\", function () {",
+                  "  pm.expect(pm.response.json()[0]).to.have.all.keys(\"id\", \"nombre\", \"provincia\");",
                   "});"
                 ]
               }
