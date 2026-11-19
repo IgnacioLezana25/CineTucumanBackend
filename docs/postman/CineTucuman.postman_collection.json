@@ -1678,7 +1678,7 @@
     },
     {
       "name": "peliculas",
-      "description": "Módulo peliculas, conectado a la base de datos con Prisma. Ejecutar la carpeta completa en orden: la petición «Crear una pelicula» guarda el id en la variable peliculaId, que usan las siguientes, y la última lo elimina. Las peticiones «Error: …» comprueban los códigos 400, 404 y 409.",
+      "description": "Módulo peliculas, conectado a la base de datos con Prisma. Ejecutar la carpeta completa en orden: la petición «Crear una pelicula» guarda el id en la variable peliculaId, que usan las siguientes, y la última lo elimina. Las peticiones «Error: …» comprueban los códigos 400, 404 y 409. Crear, modificar y eliminar piden el token de un administrador: la carpeta inicia sesión sola y comprueba los 401 y 403.",
       "item": [
         {
           "name": "Iniciar sesion como administrador",
@@ -2300,6 +2300,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -2350,6 +2354,10 @@
           "request": {
             "method": "PATCH",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -2402,6 +2410,10 @@
             "method": "PATCH",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -2449,6 +2461,10 @@
           "request": {
             "method": "PATCH",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -2498,6 +2514,10 @@
             "method": "PATCH",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -2546,6 +2566,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -2589,6 +2613,10 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -2634,6 +2662,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -2677,6 +2709,10 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -2722,6 +2758,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -2765,6 +2805,10 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -2902,7 +2946,12 @@
           "name": "Error: eliminar una pelicula con funciones (409)",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/peliculas/1",
               "host": [
@@ -2933,7 +2982,12 @@
           "name": "Eliminar la pelicula creada",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/peliculas/{{peliculaId}}",
               "host": [
@@ -2967,7 +3021,12 @@
           "name": "Error: eliminar de nuevo (404)",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/peliculas/{{peliculaId}}",
               "host": [
@@ -2998,7 +3057,7 @@
     },
     {
       "name": "funciones",
-      "description": "Módulo funciones, conectado a la base de datos con Prisma. Ejecutar la carpeta completa en orden: «Crear una funcion» elige un horario futuro al azar y guarda el id en la variable funcionId, que usan las siguientes, y «Eliminar la funcion creada» la borra. Las peticiones «Error: …» comprueban los códigos 400, 404 y 409; la función 6 tiene entradas vendidas en los datos de ejemplo.",
+      "description": "Módulo funciones, conectado a la base de datos con Prisma. Ejecutar la carpeta completa en orden: «Crear una funcion» elige un horario futuro al azar y guarda el id en la variable funcionId, que usan las siguientes, y «Eliminar la funcion creada» la borra. Las peticiones «Error: …» comprueban los códigos 400, 404 y 409; la función 6 tiene entradas vendidas en los datos de ejemplo. Crear, modificar y eliminar piden el token de un administrador: la carpeta inicia sesión sola y comprueba los 401 y 403.",
       "item": [
         {
           "name": "Iniciar sesion como administrador",
@@ -3638,6 +3697,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -3699,6 +3762,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -3742,6 +3809,10 @@
           "request": {
             "method": "PATCH",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -3793,6 +3864,10 @@
             "method": "PATCH",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -3841,6 +3916,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -3884,6 +3963,10 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -3929,6 +4012,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -3973,6 +4060,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -4016,6 +4107,10 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -4160,6 +4255,10 @@
             "method": "PATCH",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -4203,7 +4302,12 @@
           "name": "Error: eliminar una funcion con entradas vendidas (409)",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/funciones/6",
               "host": [
@@ -4234,7 +4338,12 @@
           "name": "Eliminar la funcion creada",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/funciones/{{funcionId}}",
               "host": [
@@ -4268,7 +4377,12 @@
           "name": "Error: eliminar de nuevo (404)",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/funciones/{{funcionId}}",
               "host": [
