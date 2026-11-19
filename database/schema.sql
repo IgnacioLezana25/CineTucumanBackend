@@ -93,6 +93,7 @@ CREATE TABLE ciudades (
 );
 
 -- La dirección es solo la calle y el número: la ciudad y la provincia salen de ciudades.
+-- La referencia indica dónde queda el cine (por ejemplo, dentro de qué shopping); es opcional.
 CREATE TABLE sucursales (
   id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   slug           VARCHAR(60)  NOT NULL,
@@ -100,6 +101,7 @@ CREATE TABLE sucursales (
   ciudad_id      INTEGER      NOT NULL,
   direccion      VARCHAR(100) NOT NULL,
   descripcion    TEXT,
+  referencia     VARCHAR(120),
   imagen_archivo VARCHAR(120),
   destacada      BOOLEAN      NOT NULL DEFAULT FALSE,
   CONSTRAINT sucursales_slug_key UNIQUE (slug),

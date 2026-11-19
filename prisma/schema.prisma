@@ -87,6 +87,7 @@ model Sucursal {
   ciudadId      Int              @map("ciudad_id")
   direccion     String           @db.VarChar(100)
   descripcion   String?
+  referencia    String?          @db.VarChar(120)
   imagenArchivo String?          @map("imagen_archivo") @db.VarChar(120)
   destacada     Boolean          @default(false)
   ciudad        Ciudad           @relation(fields: [ciudadId], references: [id], onDelete: Restrict, map: "sucursales_ciudad_fkey")

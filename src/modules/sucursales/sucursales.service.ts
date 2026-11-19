@@ -47,6 +47,7 @@ export class SucursalesService {
         data: {
           ...datos,
           descripcion: datos.descripcion ?? null,
+          referencia: datos.referencia ?? null,
           imagenArchivo: datos.imagenArchivo ?? null,
           enlaces: { create: enlaces ?? [] },
         },
@@ -180,6 +181,7 @@ export class SucursalesService {
       provincia: sucursal.ciudad.provincia,
       direccion: sucursal.direccion,
       descripcion: sucursal.descripcion,
+      referencia: sucursal.referencia,
       imagenArchivo: sucursal.imagenArchivo,
       imagenUrl: sucursal.imagenArchivo
         ? urlDeImagen(this.urlBase, 'sucursales', sucursal.imagenArchivo)

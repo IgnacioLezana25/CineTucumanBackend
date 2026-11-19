@@ -90,15 +90,15 @@ INSERT INTO ciudades (nombre) VALUES
   ('Concepción');
 
 -- Sucursales (5). La dirección es solo la calle y el número: la ciudad sale de la tabla ciudades.
-INSERT INTO sucursales (slug, nombre, ciudad_id, direccion, descripcion, imagen_archivo, destacada)
-SELECT v.slug, v.nombre, c.id, v.direccion, v.descripcion, v.imagen, v.destacada
+INSERT INTO sucursales (slug, nombre, ciudad_id, direccion, descripcion, referencia, imagen_archivo, destacada)
+SELECT v.slug, v.nombre, c.id, v.direccion, v.descripcion, v.referencia, v.imagen, v.destacada
 FROM (VALUES
-  ('cine-atlas-monteagudo', 'Cine Atlas Monteagudo', 'San Miguel de Tucumán', 'Monteagudo 250', 'Complejo Cine Atlas ubicado en San Miguel de Tucumán.', 'cine-atlas-monteagudo.jpg', TRUE),
-  ('cine-atlas-via-24', 'Cine Atlas Vía 24', 'San Miguel de Tucumán', '24 de Septiembre 757', 'Complejo Cine Atlas ubicado en una zona céntrica de San Miguel de Tucumán.', 'cine-atlas-via-24.jpg', FALSE),
-  ('cinemacenter-tucuman', 'Cinemacenter Tucumán', 'San Miguel de Tucumán', 'Avenida Roca 3450', 'Complejo Cinemacenter ubicado en la zona de Avenida Roca de San Miguel de Tucumán.', 'cinemacenter-tucuman.jpg', TRUE),
-  ('sunstar-cinemas', 'Sunstar Cinemas', 'Yerba Buena', 'Avenida Fermín Cariola 42', 'Complejo Sunstar Cinemas ubicado en Yerba Buena.', 'sunstar-cinemas.jpg', TRUE),
-  ('cines-del-solar', 'Cines del Solar', 'Yerba Buena', 'Avenida Aconquija 1300', 'Complejo Cines del Solar ubicado en Yerba Buena.', 'cines-del-solar.jpg', FALSE)
-) AS v (slug, nombre, ciudad, direccion, descripcion, imagen, destacada)
+  ('cine-atlas-monteagudo', 'Cine Atlas Monteagudo', 'San Miguel de Tucumán', 'Monteagudo 250', 'Complejo Cine Atlas ubicado en San Miguel de Tucumán.', NULL, 'cine-atlas-monteagudo.jpg', TRUE),
+  ('cine-atlas-via-24', 'Cine Atlas Vía 24', 'San Miguel de Tucumán', '24 de Septiembre 757', 'Complejo Cine Atlas ubicado en una zona céntrica de San Miguel de Tucumán.', NULL, 'cine-atlas-via-24.jpg', FALSE),
+  ('cinemacenter-tucuman', 'Cinemacenter Tucumán', 'San Miguel de Tucumán', 'Avenida Roca 3450', 'Complejo Cinemacenter ubicado en la zona de Avenida Roca de San Miguel de Tucumán.', 'Hipermercado Libertad.', 'cinemacenter-tucuman.jpg', TRUE),
+  ('sunstar-cinemas', 'Sunstar Cinemas', 'Yerba Buena', 'Avenida Fermín Cariola 42', 'Complejo Sunstar Cinemas ubicado en Yerba Buena.', 'Portal de Tucumán Shopping.', 'sunstar-cinemas.jpg', TRUE),
+  ('cines-del-solar', 'Cines del Solar', 'Yerba Buena', 'Avenida Aconquija 1300', 'Complejo Cines del Solar ubicado en Yerba Buena.', 'Shopping Solar del Cerro.', 'cines-del-solar.jpg', FALSE)
+) AS v (slug, nombre, ciudad, direccion, descripcion, referencia, imagen, destacada)
 JOIN ciudades c ON c.nombre = v.ciudad;
 
 -- Enlaces de las sucursales (uno por tipo)
