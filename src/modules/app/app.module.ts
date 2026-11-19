@@ -10,6 +10,7 @@ import { FuncionesModule } from '../funciones/funciones.module.js';
 import { SucursalesModule } from '../sucursales/sucursales.module.js';
 import { ProductosModule } from '../productos/productos.module.js';
 import { OrdenesModule } from '../ordenes/ordenes.module.js';
+import { CatalogosModule } from '../catalogos/catalogos.module.js';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { OrdenesModule } from '../ordenes/ordenes.module.js';
     SucursalesModule,
     ProductosModule,
     OrdenesModule,
+    CatalogosModule,
   ],
   controllers: [AppController],
   providers: [AppService],

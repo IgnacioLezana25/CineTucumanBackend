@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '../../generated/prisma/client.js';
+import { urlBaseDeLaApi, urlDeImagen } from '../comunes/url-publica.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   PRISMA_CLAVE_FORANEA,
@@ -27,8 +28,6 @@ type PeliculaConRelaciones = Prisma.PeliculaGetPayload<{
   include: typeof INCLUIR_RELACIONES;
 }>;
 
-const PUERTO_POR_DEFECTO = 4000;
-
 @Injectable()
 export class PeliculasService {
   private readonly urlBase: string;
@@ -37,11 +36,7 @@ export class PeliculasService {
     private readonly prisma: PrismaService,
     configuracion: ConfigService,
   ) {
-    const puerto = configuracion.get<number>('PORT') ?? PUERTO_POR_DEFECTO;
-    const urlBase =
-      configuracion.get<string>('API_BASE_URL') ?? `http://localhost:${puerto}/`;
-
-    this.urlBase = urlBase.replace(/\/+$/, '');
+    this.urlBase = urlBaseDeLaApi(configuracion);
   }
 
   async create(createPeliculaDto: CreatePeliculaDto): Promise<Pelicula> {
@@ -217,7 +212,7 @@ export class PeliculasService {
         ? pelicula.fechaEstreno.toISOString().slice(0, 10)
         : null,
       posterArchivo: pelicula.posterArchivo,
-      posterUrl: `${this.urlBase}/imagenes/peliculas/${encodeURIComponent(pelicula.posterArchivo)}`,
+      posterUrl: urlDeImagen(this.urlBase, 'peliculas', pelicula.posterArchivo),
       trailerYoutube: pelicula.trailerYoutube,
       director: pelicula.director,
       paisOrigen: pelicula.paisOrigen,

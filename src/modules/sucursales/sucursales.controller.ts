@@ -1,14 +1,17 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  Controller,
   Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
 } from '@nestjs/common';
 import { SucursalesService } from './sucursales.service.js';
 import { CreateSucursalDto } from './dto/create-sucursal.dto.js';
+import { FiltrarSucursalesDto } from './dto/filtrar-sucursales.dto.js';
 import { UpdateSucursalDto } from './dto/update-sucursal.dto.js';
 
 @Controller('sucursales')
@@ -21,25 +24,30 @@ export class SucursalesController {
   }
 
   @Get()
-  findAll() {
-    return this.sucursalesService.findAll();
+  findAll(@Query() filtros: FiltrarSucursalesDto) {
+    return this.sucursalesService.findAll(filtros);
+  }
+
+  @Get('slug/:slug')
+  findBySlug(@Param('slug') slug: string) {
+    return this.sucursalesService.findBySlug(slug);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.sucursalesService.findOne(+id);
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.sucursalesService.findOne(id);
   }
 
   @Patch(':id')
   update(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() updateSucursalDto: UpdateSucursalDto,
   ) {
-    return this.sucursalesService.update(+id, updateSucursalDto);
+    return this.sucursalesService.update(id, updateSucursalDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.sucursalesService.remove(+id);
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.sucursalesService.remove(id);
   }
 }
