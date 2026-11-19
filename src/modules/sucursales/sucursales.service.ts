@@ -7,6 +7,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '../../generated/prisma/client.js';
 import { urlBaseDeLaApi, urlDeImagen } from '../comunes/url-publica.util.js';
+import { ArchivoSubido } from '../imagenes/archivo-subido.types.js';
+import { ImagenesService } from '../imagenes/imagenes.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   PRISMA_CLAVE_FORANEA,
@@ -34,6 +36,7 @@ export class SucursalesService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly imagenes: ImagenesService,
     configuracion: ConfigService,
   ) {
     this.urlBase = urlBaseDeLaApi(configuracion);
@@ -132,12 +135,56 @@ export class SucursalesService {
     }
   }
 
+  async subirImagen(id: number, archivo?: ArchivoSubido): Promise<Sucursal> {
+    const sucursal = await this.prisma.sucursal.findUnique({
+      where: { id },
+      include: INCLUIR_RELACIONES,
+    });
+
+    if (!sucursal) {
+      throw new NotFoundException(`No existe una sucursal con id ${id}.`);
+    }
+
+    const imagenNueva = await this.imagenes.guardar(
+      'sucursales',
+      sucursal.slug,
+      archivo,
+    );
+    let actualizada: SucursalConRelaciones;
+
+    try {
+      actualizada = await this.prisma.sucursal.update({
+        where: { id },
+        data: { imagenArchivo: imagenNueva },
+        include: INCLUIR_RELACIONES,
+      });
+    } catch (error) {
+      await this.imagenes.eliminar('sucursales', imagenNueva);
+
+      if (codigoDeError(error) === PRISMA_NO_ENCONTRADO) {
+        throw new NotFoundException(`No existe una sucursal con id ${id}.`);
+      }
+
+      throw error;
+    }
+
+    if (sucursal.imagenArchivo) {
+      await this.imagenes.eliminar('sucursales', sucursal.imagenArchivo);
+    }
+
+    return this.presentar(actualizada);
+  }
+
   async remove(id: number): Promise<Sucursal> {
     try {
       const sucursal = await this.prisma.sucursal.delete({
         where: { id },
         include: INCLUIR_RELACIONES,
       });
+
+      if (sucursal.imagenArchivo) {
+        await this.imagenes.eliminar('sucursales', sucursal.imagenArchivo);
+      }
 
       return this.presentar(sucursal);
     } catch (error) {

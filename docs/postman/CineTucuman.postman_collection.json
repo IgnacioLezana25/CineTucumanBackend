@@ -1678,7 +1678,7 @@
     },
     {
       "name": "peliculas",
-      "description": "Módulo peliculas, conectado a la base de datos con Prisma. Ejecutar la carpeta completa en orden: la petición «Crear una pelicula» guarda el id en la variable peliculaId, que usan las siguientes, y la última lo elimina. Las peticiones «Error: …» comprueban los códigos 400, 404 y 409. Crear, modificar y eliminar piden el token de un administrador: la carpeta inicia sesión sola y comprueba los 401 y 403.",
+      "description": "Módulo peliculas, conectado a la base de datos con Prisma. Ejecutar la carpeta completa en orden: la petición «Crear una pelicula» guarda el id en la variable peliculaId, que usan las siguientes, y la última lo elimina. Las peticiones «Error: …» comprueban los códigos 400, 404 y 409. Crear, modificar y eliminar piden el token de un administrador: la carpeta inicia sesión sola y comprueba los 401 y 403. La subida de imágenes (POST …/poster con un archivo en el campo \"archivo\") se prueba a mano porque Postman no guarda archivos de la computadora en la colección; acá se comprueban sus errores.",
       "item": [
         {
           "name": "Iniciar sesion como administrador",
@@ -2924,6 +2924,152 @@
                 "peliculas",
                 "slug",
                 "no-existe"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: subir un poster sin token (401)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas/1/poster",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas",
+                "1",
+                "poster"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: subir un poster con el token de un cliente (403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenCliente}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas/1/poster",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas",
+                "1",
+                "poster"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: subir un poster sin enviar el archivo (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas/{{peliculaId}}/poster",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas",
+                "{{peliculaId}}",
+                "poster"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Explica que falta el archivo\", function () {",
+                  "  pm.expect(pm.response.json().message).to.include(\"Falta el archivo\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: subir un poster a un registro inexistente (404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas/999999/poster",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas",
+                "999999",
+                "poster"
               ]
             }
           },
@@ -4413,7 +4559,7 @@
     },
     {
       "name": "sucursales",
-      "description": "Módulo sucursales, conectado a la base de datos con Prisma. Ejecutar la carpeta completa en orden: «Crear una sucursal» guarda el id en la variable sucursalId, que usan las siguientes, y «Eliminar la sucursal creada» la borra. Las peticiones «Error: …» comprueban los códigos 400, 404 y 409. Crear, modificar y eliminar piden el token de un administrador: la carpeta inicia sesión sola y comprueba los 401 y 403.",
+      "description": "Módulo sucursales, conectado a la base de datos con Prisma. Ejecutar la carpeta completa en orden: «Crear una sucursal» guarda el id en la variable sucursalId, que usan las siguientes, y «Eliminar la sucursal creada» la borra. Las peticiones «Error: …» comprueban los códigos 400, 404 y 409. Crear, modificar y eliminar piden el token de un administrador: la carpeta inicia sesión sola y comprueba los 401 y 403. La subida de imágenes (POST …/imagen con un archivo en el campo \"archivo\") se prueba a mano porque Postman no guarda archivos de la computadora en la colección; acá se comprueban sus errores.",
       "item": [
         {
           "name": "Iniciar sesion como administrador",
@@ -5382,6 +5528,152 @@
               "path": [
                 "sucursales",
                 "99999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: subir una imagen sin token (401)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sucursales/1/imagen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sucursales",
+                "1",
+                "imagen"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: subir una imagen con el token de un cliente (403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenCliente}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sucursales/1/imagen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sucursales",
+                "1",
+                "imagen"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: subir una imagen sin enviar el archivo (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sucursales/{{sucursalId}}/imagen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sucursales",
+                "{{sucursalId}}",
+                "imagen"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Explica que falta el archivo\", function () {",
+                  "  pm.expect(pm.response.json().message).to.include(\"Falta el archivo\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: subir una imagen a un registro inexistente (404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sucursales/999999/imagen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sucursales",
+                "999999",
+                "imagen"
               ]
             }
           },
