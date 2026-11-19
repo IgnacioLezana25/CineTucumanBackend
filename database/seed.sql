@@ -67,6 +67,19 @@ FROM (VALUES
 ) AS v (slug, titulo, titulo_original, sinopsis, duracion, clasificacion, estado, destacada, estreno, poster, trailer, director, pais)
 LEFT JOIN clasificaciones c ON c.nombre = v.clasificacion;
 
+-- Reparto de las películas que lo tienen cargado, en el orden en que se muestra
+INSERT INTO pelicula_reparto (pelicula_id, orden, nombre, foto_archivo)
+SELECT p.id, v.orden, v.nombre, v.foto
+FROM (VALUES
+  ('spider-man-un-nuevo-dia', 1, 'Tom Holland', 'tom-holland.jpg'),
+  ('spider-man-un-nuevo-dia', 2, 'Zendaya', 'zendaya.jpg'),
+  ('spider-man-un-nuevo-dia', 3, 'Sadie Sink', 'sadie-sink.jpg'),
+  ('spider-man-un-nuevo-dia', 4, 'Jacob Batalon', 'jacob-batalon.jpg'),
+  ('spider-man-un-nuevo-dia', 5, 'Jon Bernthal', 'jon-bernthal.jpg'),
+  ('spider-man-un-nuevo-dia', 6, 'Mark Ruffalo', 'mark-ruffalo.jpg')
+) AS v (slug, orden, nombre, foto)
+JOIN peliculas p ON p.slug = v.slug;
+
 -- Géneros de cada película (relación muchos a muchos)
 INSERT INTO peliculas_generos (pelicula_id, genero_id)
 SELECT p.id, g.id

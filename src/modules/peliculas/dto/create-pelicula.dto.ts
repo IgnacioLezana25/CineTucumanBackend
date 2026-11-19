@@ -1,4 +1,6 @@
+import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayUnique,
   IsArray,
   IsBoolean,
@@ -12,7 +14,9 @@ import {
   Matches,
   Max,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+import { ActorPeliculaDto } from './actor-pelicula.dto.js';
 
 export class CreatePeliculaDto {
   @IsString()
@@ -85,4 +89,12 @@ export class CreatePeliculaDto {
   @IsInt({ each: true })
   @IsPositive({ each: true })
   generoIds?: number[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(30)
+  @ArrayUnique((actor: ActorPeliculaDto) => actor.nombre)
+  @ValidateNested({ each: true })
+  @Type(() => ActorPeliculaDto)
+  reparto?: ActorPeliculaDto[];
 }

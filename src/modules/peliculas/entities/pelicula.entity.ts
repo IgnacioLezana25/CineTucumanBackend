@@ -1,3 +1,9 @@
+export class ActorPelicula {
+  nombre: string;
+  fotoArchivo: string | null;
+  fotoUrl: string | null;
+}
+
 export class Pelicula {
   id: number;
   slug: string;
@@ -17,4 +23,5 @@ export class Pelicula {
   paisOrigen: string | null;
   generoIds: number[];
   generos: string[];
+  reparto: ActorPelicula[];
 }
