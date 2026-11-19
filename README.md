@@ -66,6 +66,7 @@ JWT_EXPIRES_IN=1h
 | `FRONTEND_URL` | Desde dónde se permite llamar a la API (CORS). Si falta, usa `http://localhost:5173`. Admite varias direcciones separadas por coma |
 | `JWT_SECRET` | **Obligatoria.** El secreto con el que se firman los tokens de acceso, de **al menos 32 caracteres**. Si falta o es más corta, la API no arranca y lo avisa. Cada integrante usa la suya y nunca se sube a GitHub |
 | `JWT_EXPIRES_IN` | Cuánto dura un token: `1h`, `30m`, `7d` o una cantidad de segundos. Si falta, dura una hora |
+| `UPLOADS_DIR` | Opcional. La carpeta donde se guardan las imágenes subidas desde la API. Si falta, usa `uploads` (dentro del proyecto, fuera de Git) |
 
 Una forma de generar un `JWT_SECRET` seguro: `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`.
 
@@ -288,6 +289,7 @@ docs/postman/        Colección y entorno de Postman
 prisma/              Esquema de Prisma y migraciones
 prisma.config.ts     Configuración de la herramienta de Prisma
 public/imagenes/     Archivos que la API sirve por URL (pósters de películas, fotos del reparto y fotos de sucursales)
+uploads/             Imágenes subidas desde la API (no se sube a GitHub); se sirven por la misma URL que las de arriba
 src/
   main.ts            Punto de entrada: crea la aplicación, activa la validación y el CORS, sirve las imágenes y la pone a escuchar
   modules/           Todos los módulos del proyecto
@@ -296,6 +298,7 @@ src/
     catalogos/       Géneros, clasificaciones y ciudades (solo lectura)
     comunes/         Utilidades compartidas, como armar la URL pública de una imagen o pasar un instante a la fecha y la hora de Tucumán
     auth/            Registro, inicio de sesión, tokens JWT y guards de acceso
+    imagenes/        Guardado y borrado de las imágenes que se suben
     users/           Usuarios
     peliculas/       Películas
     funciones/       Funciones
@@ -333,6 +336,7 @@ Todos los módulos leen y escriben en la base de datos.
 | `POST /peliculas` | Crea una película con `CreatePeliculaDto`, con su reparto opcional (hasta 30 actores, sin nombres repetidos) | 201; 400 si falta un dato, un dato no es válido o la clasificación o un género no existen; 409 si el `slug` ya existe; 401 sin token; 403 si no es administrador |
 | `PATCH /peliculas/:id` | Modifica solo los campos que se envían. Si se envía `generoIds`, reemplaza todos los géneros; con `[]` los quita. Con `reparto` pasa lo mismo con los actores. Con `null` se vacían los campos opcionales | 200; 400; 404; 409; 401 sin token; 403 si no es administrador |
 | `DELETE /peliculas/:id` | Elimina la película y devuelve lo que eliminó | 200; 404; 409 si tiene funciones; 401 sin token; 403 si no es administrador |
+| `POST /peliculas/:id/poster` | Reemplaza el póster de la película con la imagen enviada (ver *Imágenes*) | 200 con la película; 400 si falta el archivo o no es una imagen válida; 401; 403; 404; 413 si pesa más de 5 MB |
 
 Cada película se devuelve así:
 
@@ -442,6 +446,7 @@ Listas de solo lectura para armar los formularios (por ejemplo, los géneros y l
 | `POST /sucursales` | Crea una sucursal con `CreateSucursalDto`, con sus enlaces | 201; 400 si un dato no es válido (por ejemplo, un enlace sin `https://`) o la ciudad no existe; 409 si el `slug` ya existe; 401 sin token; 403 si no es administrador |
 | `PATCH /sucursales/:id` | Modifica los campos que se envían. Si se envía `enlaces`, reemplaza todos los enlaces; con `[]` los quita | 200; 400; 404; 409; 401 sin token; 403 si no es administrador |
 | `DELETE /sucursales/:id` | Elimina la sucursal con sus salas y sus enlaces, y devuelve lo que eliminó | 200; 404; 409 si alguna de sus salas tiene funciones; 401 sin token; 403 si no es administrador |
+| `POST /sucursales/:id/imagen` | Reemplaza la imagen de la sucursal con la imagen enviada (ver *Imágenes*) | 200 con la sucursal; 400 si falta el archivo o no es una imagen válida; 401; 403; 404; 413 si pesa más de 5 MB |
 
 ```json
 {
@@ -593,6 +598,20 @@ El usuario sale del token y los precios, de la base: si el cuerpo trae `usuarioI
 
 `posterUrl` se arma con `API_BASE_URL` y apunta a un archivo de `public/imagenes/peliculas/`, que la API sirve directamente. `posterArchivo` es el nombre que se guarda en la base y el que se envía al crear o editar una película. Las sucursales funcionan igual con `imagenArchivo` e `imagenUrl`, con los archivos de `public/imagenes/sucursales/`, y el reparto con `fotoArchivo` y `fotoUrl`, con los de `public/imagenes/reparto/`.
 
+**Subir una imagen nueva.** Un administrador envía el archivo en el campo `archivo` de un formulario `multipart/form-data` a `POST /peliculas/:id/poster` (póster de una película) o a `POST /sucursales/:id/imagen` (imagen de una sucursal), con el token en `Authorization: Bearer <access_token>`. Por ejemplo, desde Git Bash:
+
+```
+curl -X POST http://localhost:4000/peliculas/1/poster -H "Authorization: Bearer $ADMIN" -F "archivo=@poster.jpg"
+```
+
+- **Qué se acepta:** JPG, PNG y WebP, de hasta 5 MB. El tipo se decide por el contenido del archivo y no por su nombre ni por el `Content-Type` que declare el cliente, así que un texto o un SVG renombrado a `.png` se rechaza con 400.
+- **Dónde queda:** en `uploads/peliculas/` o `uploads/sucursales/` (o en la carpeta de `UPLOADS_DIR`), que no se sube a GitHub. La API la sirve en la misma dirección que las demás imágenes: `/imagenes/peliculas/<archivo>` y `/imagenes/sucursales/<archivo>`.
+- **Cómo se llama:** el servidor le pone un nombre propio, `<slug>-<12 caracteres al azar>.<extensión>`, sin usar el nombre que traía el archivo. Como cada subida tiene un nombre distinto, el navegador nunca muestra una versión vieja guardada en caché.
+- **Qué devuelve:** la película o la sucursal ya actualizada, con su `posterArchivo` o `imagenArchivo` nuevo y la URL completa en `posterUrl` o `imagenUrl`.
+- **Limpieza:** al subir una imagen nueva se borra la subida anterior, y al eliminar la película o la sucursal se borra la suya. Los archivos de `public/imagenes/` (los del proyecto) nunca se tocan.
+- **Errores:** 400 si falta el archivo, si llega en otro campo o si no es una imagen válida; 413 si pesa más de 5 MB; 404 si la película o la sucursal no existe. Los mensajes del 413 y del campo equivocado los genera la librería de subida y salen en inglés.
+- Los archivos subidos viven en el disco del servidor: si la API se publica en un servicio que borra el disco al reiniciar, hay que guardarlos en otro lado.
+
 ## Permisos
 
 Cada ruta es pública, pide el token de cualquier usuario o pide el token de un administrador. El token se envía en `Authorization: Bearer <access_token>` (ver *Autenticación*).
@@ -603,7 +622,7 @@ Cada ruta es pública, pide el token de cualquier usuario o pide el token de un 
 | `GET /auth/perfil` y las rutas de `/ordenes` | Cualquier usuario con token (cada uno ve solo lo suyo; el administrador ve todo) |
 | `GET /users/:id` y `PATCH /users/:id` | El propio usuario o un administrador |
 | `GET /users` y `DELETE /users/:id` | Solo un administrador |
-| `POST`, `PATCH` y `DELETE` de `/peliculas`, `/funciones`, `/sucursales` y `/productos` | Solo un administrador |
+| `POST`, `PATCH` y `DELETE` de `/peliculas`, `/funciones`, `/sucursales` y `/productos`, y la subida de imágenes (`POST /peliculas/:id/poster` y `POST /sucursales/:id/imagen`) | Solo un administrador |
 
 Estas últimas responden **401** si falta el token, venció o no es válido, y **403** si el token es de un cliente. Los permisos se revisan antes que el cuerpo del pedido, así que un cliente recibe 403 aunque los datos sean inválidos. Los demás códigos de cada módulo (400, 404, 409) no cambian.
 
@@ -613,7 +632,7 @@ En [`docs/postman/`](docs/postman) están la colección y el entorno:
 
 1. En Postman, **Import** y elegir `CineTucuman.postman_collection.json` y `CineTucuman.postman_environment.json`.
 2. Elegir el entorno **Cine Tucumán · local** (define `baseUrl` como `http://localhost:4000`; hay que cambiarla si el puerto del `.env` es otro).
-3. Con el servidor andando y la base cargada con los datos de ejemplo, ejecutar la colección: tiene una carpeta por módulo con sus peticiones, y cada una comprueba el código de respuesta. Las carpetas `auth` y `users` guardan solas el token que devuelve el login (variables `tokenCliente` y `tokenAdmin` de la colección) y lo usan en las peticiones siguientes. Las carpetas `peliculas`, `funciones`, `sucursales` y `productos` inician sesión por su cuenta como administrador (para crear, modificar y eliminar) y como cliente, comprueban los 401 y 403 de esas rutas, e incluyen además los filtros, la búsqueda por `slug` y los casos de error (400, 404 y 409). Cada carpeta se ejecuta completa y en orden: crea un registro de prueba, lo modifica y lo elimina, así que la base queda como estaba. La carpeta `ordenes` crea su propia función lejana en el tiempo (así no depende de las fechas de los datos de ejemplo), compra, consulta y cancela, y elimina la función; como una orden no se puede eliminar, cada corrida deja una orden `cancelada` en la base.
+3. Con el servidor andando y la base cargada con los datos de ejemplo, ejecutar la colección: tiene una carpeta por módulo con sus peticiones, y cada una comprueba el código de respuesta. Las carpetas `auth` y `users` guardan solas el token que devuelve el login (variables `tokenCliente` y `tokenAdmin` de la colección) y lo usan en las peticiones siguientes. Las carpetas `peliculas`, `funciones`, `sucursales` y `productos` inician sesión por su cuenta como administrador (para crear, modificar y eliminar) y como cliente, comprueban los 401 y 403 de esas rutas, e incluyen además los filtros, la búsqueda por `slug` y los casos de error (400, 404 y 409). La subida de imágenes se prueba a mano (Postman no guarda archivos de la computadora en la colección): la colección comprueba solo sus errores. Cada carpeta se ejecuta completa y en orden: crea un registro de prueba, lo modifica y lo elimina, así que la base queda como estaba. La carpeta `ordenes` crea su propia función lejana en el tiempo (así no depende de las fechas de los datos de ejemplo), compra, consulta y cancela, y elimina la función; como una orden no se puede eliminar, cada corrida deja una orden `cancelada` en la base.
 
 ## Estrategia de ramas
 
@@ -631,5 +650,5 @@ Cada rama sale de `dev`. Los cambios entran por un pull request con base `dev`, 
 ## Próximas etapas
 
 - Conviene mantener fija la versión 7.10.1 de `prisma`: la etiqueta `latest` del paquete apunta hoy a un candidato de la versión 8.
-- Subida de pósters nuevos desde el panel de administración.
+- Subir también las fotos del reparto de cada película (hoy solo se suben los pósters y las imágenes de sucursales).
 - Conectar el frontend a esta API en lugar de sus datos locales.
