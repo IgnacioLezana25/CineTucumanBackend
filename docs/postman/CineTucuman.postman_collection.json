@@ -4413,7 +4413,7 @@
     },
     {
       "name": "sucursales",
-      "description": "Módulo sucursales, conectado a la base de datos con Prisma. Ejecutar la carpeta completa en orden: «Crear una sucursal» guarda el id en la variable sucursalId, que usan las siguientes, y «Eliminar la sucursal creada» la borra. Las peticiones «Error: …» comprueban los códigos 400, 404 y 409.",
+      "description": "Módulo sucursales, conectado a la base de datos con Prisma. Ejecutar la carpeta completa en orden: «Crear una sucursal» guarda el id en la variable sucursalId, que usan las siguientes, y «Eliminar la sucursal creada» la borra. Las peticiones «Error: …» comprueban los códigos 400, 404 y 409. Crear, modificar y eliminar piden el token de un administrador: la carpeta inicia sesión sola y comprueba los 401 y 403.",
       "item": [
         {
           "name": "Iniciar sesion como administrador",
@@ -4920,6 +4920,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -4969,6 +4973,10 @@
           "request": {
             "method": "PATCH",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -5021,6 +5029,10 @@
             "method": "PATCH",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -5068,6 +5080,10 @@
           "request": {
             "method": "PATCH",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -5119,6 +5135,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -5162,6 +5182,10 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -5207,6 +5231,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -5251,6 +5279,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -5294,6 +5326,10 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -5368,7 +5404,12 @@
           "name": "Error: eliminar una sucursal con funciones (409)",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/sucursales/4",
               "host": [
@@ -5399,7 +5440,12 @@
           "name": "Eliminar la sucursal creada",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/sucursales/{{sucursalId}}",
               "host": [
@@ -5433,7 +5479,12 @@
           "name": "Error: eliminar de nuevo (404)",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/sucursales/{{sucursalId}}",
               "host": [
@@ -5464,7 +5515,7 @@
     },
     {
       "name": "productos",
-      "description": "Módulo productos, conectado a la base de datos con Prisma. Ejecutar la carpeta completa en orden: «Crear un producto» guarda el id en la variable productoId, que usan las siguientes, y «Eliminar el producto creado» lo borra. Las peticiones «Error: …» comprueban los códigos 400, 404 y 409.",
+      "description": "Módulo productos, conectado a la base de datos con Prisma. Ejecutar la carpeta completa en orden: «Crear un producto» guarda el id en la variable productoId, que usan las siguientes, y «Eliminar el producto creado» lo borra. Las peticiones «Error: …» comprueban los códigos 400, 404 y 409. Crear, modificar y eliminar piden el token de un administrador: la carpeta inicia sesión sola y comprueba los 401 y 403.",
       "item": [
         {
           "name": "Iniciar sesion como administrador",
@@ -6007,6 +6058,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -6055,6 +6110,10 @@
           "request": {
             "method": "PATCH",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -6107,6 +6166,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -6150,6 +6213,10 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -6195,6 +6262,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -6239,6 +6310,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -6282,6 +6357,10 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -6356,7 +6435,12 @@
           "name": "Error: eliminar un producto que figura en órdenes (409)",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/productos/1",
               "host": [
@@ -6387,7 +6471,12 @@
           "name": "Eliminar el producto creado",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/productos/{{productoId}}",
               "host": [
@@ -6421,7 +6510,12 @@
           "name": "Error: eliminar de nuevo (404)",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/productos/{{productoId}}",
               "host": [
