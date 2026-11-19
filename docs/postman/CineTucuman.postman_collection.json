@@ -2471,6 +2471,7 @@
                   "});",
                   "pm.test(\"Es la sucursal pedida\", function () {",
                   "  pm.expect(pm.response.json().slug).to.eql(\"sunstar-cinemas\");",
+                  "  pm.expect(pm.response.json().referencia).to.eql(\"Portal de Tucumán Shopping.\");",
                   "});"
                 ]
               }
@@ -2499,7 +2500,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"slug\": \"sucursal-{{$timestamp}}\",\n  \"nombre\": \"Sucursal de prueba\",\n  \"ciudadId\": 1,\n  \"direccion\": \"Calle de prueba 123\",\n  \"descripcion\": \"Sucursal creada desde Postman.\",\n  \"imagenArchivo\": \"sunstar-cinemas.jpg\",\n  \"destacada\": false,\n  \"enlaces\": [\n    {\n      \"tipo\": \"sitio\",\n      \"url\": \"https://www.ejemplo.com.ar/\"\n    }\n  ]\n}",
+              "raw": "{\n  \"slug\": \"sucursal-{{$timestamp}}\",\n  \"nombre\": \"Sucursal de prueba\",\n  \"ciudadId\": 1,\n  \"direccion\": \"Calle de prueba 123\",\n  \"descripcion\": \"Sucursal creada desde Postman.\",\n  \"referencia\": \"Dentro de un shopping de prueba.\",\n  \"imagenArchivo\": \"sunstar-cinemas.jpg\",\n  \"destacada\": false,\n  \"enlaces\": [\n    {\n      \"tipo\": \"sitio\",\n      \"url\": \"https://www.ejemplo.com.ar/\"\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2519,6 +2520,7 @@
                   "pm.test(\"Guarda el id y devuelve sus enlaces\", function () {",
                   "  const sucursal = pm.response.json();",
                   "  pm.expect(sucursal.enlaces).to.have.lengthOf(1);",
+                  "  pm.expect(sucursal.referencia).to.eql(\"Dentro de un shopping de prueba.\");",
                   "  pm.collectionVariables.set(\"sucursalId\", sucursal.id);",
                   "});"
                 ]
@@ -2549,7 +2551,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Sucursal editada\"\n}",
+              "raw": "{\n  \"nombre\": \"Sucursal editada\",\n  \"referencia\": \"Referencia editada.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2569,6 +2571,7 @@
                   "pm.test(\"Cambia solo lo enviado\", function () {",
                   "  const sucursal = pm.response.json();",
                   "  pm.expect(sucursal.nombre).to.eql(\"Sucursal editada\");",
+                  "  pm.expect(sucursal.referencia).to.eql(\"Referencia editada.\");",
                   "  pm.expect(sucursal.enlaces).to.have.lengthOf(1);",
                   "});"
                 ]
@@ -2618,6 +2621,56 @@
                   "});",
                   "pm.test(\"Quedan los enlaces nuevos\", function () {",
                   "  pm.expect(pm.response.json().enlaces.map((enlace) => enlace.tipo)).to.eql([\"facebook\", \"instagram\"]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Quitar la referencia de una sucursal",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sucursales/{{sucursalId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sucursales",
+                "{{sucursalId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"referencia\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"La referencia queda vacía y lo demás no cambia\", function () {",
+                  "  const sucursal = pm.response.json();",
+                  "  pm.expect(sucursal.referencia).to.eql(null);",
+                  "  pm.expect(sucursal.nombre).to.eql(\"Sucursal editada\");",
                   "});"
                 ]
               }
@@ -2691,6 +2744,50 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"slug\": \"sin-nombre\",\n  \"ciudadId\": 1,\n  \"direccion\": \"Calle 1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con una referencia demasiado larga (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sucursales",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sucursales"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"referencia-larga\",\n  \"nombre\": \"Referencia larga\",\n  \"ciudadId\": 1,\n  \"direccion\": \"Calle 1\",\n  \"referencia\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
