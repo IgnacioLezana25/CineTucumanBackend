@@ -6,6 +6,9 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '../../generated/prisma/client.js';
+import { urlBaseDeLaApi, urlDeImagen } from '../comunes/url-publica.util.js';
+import { ArchivoSubido } from '../imagenes/archivo-subido.types.js';
+import { ImagenesService } from '../imagenes/imagenes.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   PRISMA_CLAVE_FORANEA,
@@ -16,18 +19,17 @@ import {
 import { CreatePeliculaDto } from './dto/create-pelicula.dto.js';
 import { FiltrarPeliculasDto } from './dto/filtrar-peliculas.dto.js';
 import { UpdatePeliculaDto } from './dto/update-pelicula.dto.js';
-import { Pelicula } from './entities/pelicula.entity.js';
+import { ActorPelicula, Pelicula } from './entities/pelicula.entity.js';
 
 const INCLUIR_RELACIONES = {
   clasificacion: true,
   generos: { include: { genero: true }, orderBy: { generoId: 'asc' } },
+  reparto: { orderBy: { orden: 'asc' } },
 } satisfies Prisma.PeliculaInclude;
 
 type PeliculaConRelaciones = Prisma.PeliculaGetPayload<{
   include: typeof INCLUIR_RELACIONES;
 }>;
-
-const PUERTO_POR_DEFECTO = 4000;
 
 @Injectable()
 export class PeliculasService {
@@ -35,17 +37,14 @@ export class PeliculasService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly imagenes: ImagenesService,
     configuracion: ConfigService,
   ) {
-    const puerto = configuracion.get<number>('PORT') ?? PUERTO_POR_DEFECTO;
-    const urlBase =
-      configuracion.get<string>('API_BASE_URL') ?? `http://localhost:${puerto}/`;
-
-    this.urlBase = urlBase.replace(/\/+$/, '');
+    this.urlBase = urlBaseDeLaApi(configuracion);
   }
 
   async create(createPeliculaDto: CreatePeliculaDto): Promise<Pelicula> {
-    const { generoIds, fechaEstreno, ...datos } = createPeliculaDto;
+    const { generoIds, reparto, fechaEstreno, ...datos } = createPeliculaDto;
 
     try {
       const pelicula = await this.prisma.pelicula.create({
@@ -62,6 +61,7 @@ export class PeliculasService {
           generos: {
             create: (generoIds ?? []).map((generoId) => ({ generoId })),
           },
+          reparto: { create: this.armarReparto(reparto ?? []) },
         },
         include: INCLUIR_RELACIONES,
       });
@@ -121,7 +121,7 @@ export class PeliculasService {
     id: number,
     updatePeliculaDto: UpdatePeliculaDto,
   ): Promise<Pelicula> {
-    const { generoIds, fechaEstreno, ...datos } = updatePeliculaDto;
+    const { generoIds, reparto, fechaEstreno, ...datos } = updatePeliculaDto;
 
     try {
       const pelicula = await this.prisma.pelicula.update({
@@ -140,6 +140,9 @@ export class PeliculasService {
                 create: generoIds.map((generoId) => ({ generoId })),
               }
             : undefined,
+          reparto: reparto
+            ? { deleteMany: {}, create: this.armarReparto(reparto) }
+            : undefined,
         },
         include: INCLUIR_RELACIONES,
       });
@@ -154,12 +157,52 @@ export class PeliculasService {
     }
   }
 
+  async subirPoster(id: number, archivo?: ArchivoSubido): Promise<Pelicula> {
+    const pelicula = await this.prisma.pelicula.findUnique({
+      where: { id },
+      include: INCLUIR_RELACIONES,
+    });
+
+    if (!pelicula) {
+      throw new NotFoundException(`No existe una película con id ${id}.`);
+    }
+
+    const posterNuevo = await this.imagenes.guardar(
+      'peliculas',
+      pelicula.slug,
+      archivo,
+    );
+    let actualizada: PeliculaConRelaciones;
+
+    try {
+      actualizada = await this.prisma.pelicula.update({
+        where: { id },
+        data: { posterArchivo: posterNuevo },
+        include: INCLUIR_RELACIONES,
+      });
+    } catch (error) {
+      await this.imagenes.eliminar('peliculas', posterNuevo);
+
+      if (codigoDeError(error) === PRISMA_NO_ENCONTRADO) {
+        throw new NotFoundException(`No existe una película con id ${id}.`);
+      }
+
+      throw error;
+    }
+
+    await this.imagenes.eliminar('peliculas', pelicula.posterArchivo);
+
+    return this.presentar(actualizada);
+  }
+
   async remove(id: number): Promise<Pelicula> {
     try {
       const pelicula = await this.prisma.pelicula.delete({
         where: { id },
         include: INCLUIR_RELACIONES,
       });
+
+      await this.imagenes.eliminar('peliculas', pelicula.posterArchivo);
 
       return this.presentar(pelicula);
     } catch (error) {
@@ -177,6 +220,14 @@ export class PeliculasService {
 
       throw error;
     }
+  }
+
+  private armarReparto(reparto: CreatePeliculaDto['reparto'] = []) {
+    return reparto.map((actor, indice) => ({
+      orden: indice + 1,
+      nombre: actor.nombre,
+      fotoArchivo: actor.fotoArchivo ?? null,
+    }));
   }
 
   private convertirFecha(fecha: string | null | undefined) {
@@ -217,12 +268,25 @@ export class PeliculasService {
         ? pelicula.fechaEstreno.toISOString().slice(0, 10)
         : null,
       posterArchivo: pelicula.posterArchivo,
-      posterUrl: `${this.urlBase}/imagenes/peliculas/${encodeURIComponent(pelicula.posterArchivo)}`,
+      posterUrl: urlDeImagen(this.urlBase, 'peliculas', pelicula.posterArchivo),
       trailerYoutube: pelicula.trailerYoutube,
       director: pelicula.director,
       paisOrigen: pelicula.paisOrigen,
       generoIds: pelicula.generos.map((relacion) => relacion.generoId),
       generos: pelicula.generos.map((relacion) => relacion.genero.nombre),
+      reparto: pelicula.reparto.map((actor) => this.presentarActor(actor)),
+    };
+  }
+
+  private presentarActor(
+    actor: PeliculaConRelaciones['reparto'][number],
+  ): ActorPelicula {
+    return {
+      nombre: actor.nombre,
+      fotoArchivo: actor.fotoArchivo,
+      fotoUrl: actor.fotoArchivo
+        ? urlDeImagen(this.urlBase, 'reparto', actor.fotoArchivo)
+        : null,
     };
   }
 }

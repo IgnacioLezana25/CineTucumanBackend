@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/modules/app/app.module.js';
@@ -21,7 +22,18 @@ const peliculaEnBase = {
   director: null,
   paisOrigen: null,
   clasificacion: { id: 1, nombre: 'ATP' },
-  generos: [{ peliculaId: 1, generoId: 4, genero: { id: 4, nombre: 'Animación' } }],
+  generos: [
+    { peliculaId: 1, generoId: 4, genero: { id: 4, nombre: 'Animación' } },
+  ],
+  reparto: [
+    {
+      peliculaId: 1,
+      orden: 1,
+      nombre: 'Tom Hanks',
+      fotoArchivo: 'tom-hanks.jpg',
+    },
+    { peliculaId: 1, orden: 2, nombre: 'Tim Allen', fotoArchivo: null },
+  ],
 };
 
 const cuerpoValido = {
@@ -33,6 +45,7 @@ const cuerpoValido = {
 
 describe('Peliculas (e2e)', () => {
   let app: INestApplication<App>;
+  let tokenAdmin: string;
   const pelicula = {
     create: vi.fn(),
     findMany: vi.fn(),
@@ -54,6 +67,12 @@ describe('Peliculas (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe());
     await app.init();
+
+    tokenAdmin = await app.get(JwtService).signAsync({
+      sub: 5,
+      correo: 'admin@test.com',
+      rol: 'admin',
+    });
   });
 
   afterEach(async () => {
@@ -74,12 +93,24 @@ describe('Peliculas (e2e)', () => {
       fechaEstreno: '2026-07-30',
       generos: ['Animación'],
       posterUrl: 'http://localhost:4000/imagenes/peliculas/toy-story-5.jpg',
+      reparto: [
+        {
+          nombre: 'Tom Hanks',
+          fotoArchivo: 'tom-hanks.jpg',
+          fotoUrl: 'http://localhost:4000/imagenes/reparto/tom-hanks.jpg',
+        },
+        { nombre: 'Tim Allen', fotoArchivo: null, fotoUrl: null },
+      ],
     });
-    expect(pelicula.findMany.mock.calls[0][0].where.estado).toBe('en-cartelera');
+    expect(pelicula.findMany.mock.calls[0][0].where.estado).toBe(
+      'en-cartelera',
+    );
   });
 
   it('GET /peliculas con un estado inválido responde 400', async () => {
-    await request(app.getHttpServer()).get('/peliculas?estado=otra').expect(400);
+    await request(app.getHttpServer())
+      .get('/peliculas?estado=otra')
+      .expect(400);
     expect(pelicula.findMany).not.toHaveBeenCalled();
   });
 
@@ -109,6 +140,7 @@ describe('Peliculas (e2e)', () => {
   it('POST /peliculas sin título responde 400 y no toca la base', async () => {
     await request(app.getHttpServer())
       .post('/peliculas')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ ...cuerpoValido, titulo: undefined })
       .expect(400);
 
@@ -120,6 +152,7 @@ describe('Peliculas (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/peliculas')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ ...cuerpoValido, fechaEstreno: '2026-07-30', generoIds: [4] })
       .expect(201);
 
@@ -130,11 +163,68 @@ describe('Peliculas (e2e)', () => {
     expect(datos.sinopsis).toBeNull();
   });
 
+  it('POST /peliculas con reparto lo guarda numerado en el orden recibido', async () => {
+    pelicula.create.mockResolvedValue(peliculaEnBase);
+
+    await request(app.getHttpServer())
+      .post('/peliculas')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .send({
+        ...cuerpoValido,
+        reparto: [
+          { nombre: 'Tom Hanks', fotoArchivo: 'tom-hanks.jpg' },
+          { nombre: 'Tim Allen' },
+        ],
+      })
+      .expect(201);
+
+    expect(pelicula.create.mock.calls[0][0].data.reparto).toEqual({
+      create: [
+        { orden: 1, nombre: 'Tom Hanks', fotoArchivo: 'tom-hanks.jpg' },
+        { orden: 2, nombre: 'Tim Allen', fotoArchivo: null },
+      ],
+    });
+  });
+
+  it('POST /peliculas sin reparto guarda una lista vacía', async () => {
+    pelicula.create.mockResolvedValue(peliculaEnBase);
+
+    await request(app.getHttpServer())
+      .post('/peliculas')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .send(cuerpoValido)
+      .expect(201);
+
+    expect(pelicula.create.mock.calls[0][0].data.reparto).toEqual({
+      create: [],
+    });
+  });
+
+  it('POST /peliculas con reparto inválido responde 400', async () => {
+    const repartosInvalidos = [
+      [{ nombre: '' }],
+      [{ nombre: 'Tom Hanks' }, { nombre: 'Tom Hanks' }],
+      [{ fotoArchivo: 'sin-nombre.jpg' }],
+      'Tom Hanks',
+    ];
+
+    for (const reparto of repartosInvalidos) {
+      await request(app.getHttpServer())
+        .post('/peliculas')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({ ...cuerpoValido, reparto })
+        .expect(400);
+    }
+
+    expect(pelicula.create).not.toHaveBeenCalled();
+  });
+
   it('POST /peliculas con un slug repetido responde 409', async () => {
     pelicula.create.mockRejectedValue({ code: 'P2002' });
 
     await request(app.getHttpServer())
       .post('/peliculas')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send(cuerpoValido)
       .expect(409);
   });
@@ -144,6 +234,7 @@ describe('Peliculas (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/peliculas')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ ...cuerpoValido, clasificacionId: 999 })
       .expect(400);
   });
@@ -153,6 +244,7 @@ describe('Peliculas (e2e)', () => {
 
     await request(app.getHttpServer())
       .patch('/peliculas/99')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ titulo: 'Nuevo' })
       .expect(404);
   });
@@ -162,6 +254,7 @@ describe('Peliculas (e2e)', () => {
 
     await request(app.getHttpServer())
       .patch('/peliculas/1')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ titulo: null, sinopsis: null })
       .expect(200);
 
@@ -171,10 +264,43 @@ describe('Peliculas (e2e)', () => {
     expect(datos.sinopsis).toBeNull();
   });
 
+  it('PATCH /peliculas/:id con reparto lo reemplaza y con una lista vacía lo borra', async () => {
+    pelicula.update.mockResolvedValue(peliculaEnBase);
+
+    await request(app.getHttpServer())
+      .patch('/peliculas/1')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .send({ reparto: [{ nombre: 'Tim Allen' }] })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch('/peliculas/1')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .send({ reparto: [] })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch('/peliculas/1')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .send({ titulo: 'Nuevo' })
+      .expect(200);
+
+    expect(pelicula.update.mock.calls[0][0].data.reparto).toEqual({
+      deleteMany: {},
+      create: [{ orden: 1, nombre: 'Tim Allen', fotoArchivo: null }],
+    });
+    expect(pelicula.update.mock.calls[1][0].data.reparto).toEqual({
+      deleteMany: {},
+      create: [],
+    });
+    expect(pelicula.update.mock.calls[2][0].data.reparto).toBeUndefined();
+  });
+
   it('DELETE /peliculas/:id con funciones responde 409', async () => {
     pelicula.delete.mockRejectedValue({ code: 'P2003' });
 
-    await request(app.getHttpServer()).delete('/peliculas/1').expect(409);
+    await request(app.getHttpServer())
+      .delete('/peliculas/1')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .expect(409);
   });
 
   it('DELETE /peliculas/:id devuelve la película eliminada', async () => {
@@ -182,6 +308,7 @@ describe('Peliculas (e2e)', () => {
 
     const respuesta = await request(app.getHttpServer())
       .delete('/peliculas/1')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .expect(200);
 
     expect(respuesta.body.slug).toBe('toy-story-5');

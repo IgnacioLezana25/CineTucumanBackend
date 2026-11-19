@@ -41,6 +41,11 @@ export class CreateSucursalDto {
   @IsOptional()
   @IsString()
   @MaxLength(120)
+  referencia?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
   imagenArchivo?: string;
 
   @IsOptional()
