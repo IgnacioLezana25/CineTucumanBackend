@@ -5149,13 +5149,278 @@
     },
     {
       "name": "ordenes",
-      "description": "Módulo ordenes (órdenes de compra). Las cinco rutas las generó nest g resource; por ahora devuelven un texto de ejemplo y todavía no se conectan a la base de datos.",
+      "description": "Compras de entradas y Candy Bar. La carpeta inicia sesión, crea una función de prueba lejana en el tiempo, compra, consulta y cancela, y al final elimina la función. Las órdenes quedan en la base como canceladas.",
       "item": [
         {
-          "name": "Listar ordenes",
+          "name": "Iniciar sesion como cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"juan.decima@cinetucuman.test\",\n  \"contrasena\": \"Prueba123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Guarda el token y el número de usuario\", function () {",
+                  "  const sesion = pm.response.json();",
+                  "  pm.expect(sesion.usuario.rol).to.eql(\"cliente\");",
+                  "  pm.collectionVariables.set(\"tokenCliente\", sesion.access_token);",
+                  "  pm.collectionVariables.set(\"clienteId\", sesion.usuario.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Iniciar sesion como otro cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"lazaro.molina@cinetucuman.test\",\n  \"contrasena\": \"Prueba123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Guarda el token y el número de usuario\", function () {",
+                  "  const sesion = pm.response.json();",
+                  "  pm.expect(sesion.usuario.rol).to.eql(\"cliente\");",
+                  "  pm.collectionVariables.set(\"tokenOtroCliente\", sesion.access_token);",
+                  "  pm.collectionVariables.set(\"otroClienteId\", sesion.usuario.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Iniciar sesion como administrador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"admin@cinetucuman.test\",\n  \"contrasena\": \"Prueba123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Guarda el token y el número de usuario\", function () {",
+                  "  const sesion = pm.response.json();",
+                  "  pm.expect(sesion.usuario.rol).to.eql(\"admin\");",
+                  "  pm.collectionVariables.set(\"tokenAdmin\", sesion.access_token);",
+                  "  pm.collectionVariables.set(\"adminId\", sesion.usuario.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Crear una funcion de prueba (administrador)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/funciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"peliculaId\": 3,\n  \"salaId\": 10,\n  \"iniciaEn\": \"{{ordenIniciaEn}}\",\n  \"formato\": \"3D\",\n  \"idioma\": \"Castellano\",\n  \"precio\": 9000.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const dias = 400 + Math.floor(Math.random() * 3000);",
+                  "const minutos = Math.floor(Math.random() * 1440);",
+                  "pm.collectionVariables.set(\"ordenIniciaEn\", new Date(Date.now() + dias * 86400000 + minutos * 60000).toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Guarda el id de la función\", function () {",
+                  "  pm.collectionVariables.set(\"ordenFuncionId\", pm.response.json().id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Ver las butacas de la funcion de prueba",
           "request": {
             "method": "GET",
             "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/funciones/{{ordenFuncionId}}/butacas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones",
+                "{{ordenFuncionId}}",
+                "butacas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Todas están libres y guarda dos para comprar\", function () {",
+                  "  const mapa = pm.response.json();",
+                  "  const libres = mapa.butacas.filter((butaca) => !butaca.ocupada);",
+                  "  pm.expect(mapa.vendidas).to.eql(0);",
+                  "  pm.expect(libres.length).to.be.above(2);",
+                  "  pm.collectionVariables.set(\"ordenButacaA\", libres[0].id);",
+                  "  pm.collectionVariables.set(\"ordenButacaB\", libres[1].id);",
+                  "  pm.collectionVariables.set(\"ordenButacaCodigos\", libres[0].codigo + \",\" + libres[1].codigo);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Comprar dos entradas y un combo (cliente)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenCliente}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/ordenes",
               "host": [
@@ -5164,6 +5429,15 @@
               "path": [
                 "ordenes"
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entradas\": [\n    { \"funcionId\": {{ordenFuncionId}}, \"butacaId\": {{ordenButacaA}} },\n    { \"funcionId\": {{ordenFuncionId}}, \"butacaId\": {{ordenButacaB}} }\n  ],\n  \"productos\": [\n    { \"productoId\": 1, \"cantidad\": 2 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "event": [
@@ -5172,8 +5446,22 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 200\", function () {",
-                  "  pm.response.to.have.status(200);",
+                  "pm.test(\"Responde 201\", function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Queda pagada, a nombre del cliente, con el precio del servidor\", function () {",
+                  "  const orden = pm.response.json();",
+                  "  pm.expect(orden.numero).to.match(/^CT-[A-Z0-9]{8}$/);",
+                  "  pm.expect(orden.estado).to.eql(\"pagada\");",
+                  "  pm.expect(orden.usuarioId).to.eql(Number(pm.collectionVariables.get(\"clienteId\")));",
+                  "  pm.expect(orden.entradas).to.have.lengthOf(2);",
+                  "  pm.expect(orden.entradas[0].precioUnitario).to.eql(9000.5);",
+                  "  pm.expect(orden.entradas[0].pelicula).to.be.a(\"string\");",
+                  "  pm.expect(orden.productos).to.have.lengthOf(1);",
+                  "  pm.expect(orden.productos[0].subtotal).to.eql(12000);",
+                  "  pm.expect(orden.total).to.eql(30001);",
+                  "  pm.collectionVariables.set(\"ordenId\", orden.id);",
+                  "  pm.collectionVariables.set(\"ordenNumero\", orden.numero);",
                   "});"
                 ]
               }
@@ -5182,18 +5470,19 @@
           "response": []
         },
         {
-          "name": "Ver un registro de ordenes",
+          "name": "Ver las butacas ocupadas tras la compra",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/ordenes/1",
+              "raw": "{{baseUrl}}/funciones/{{ordenFuncionId}}/butacas",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "ordenes",
-                "1"
+                "funciones",
+                "{{ordenFuncionId}}",
+                "butacas"
               ]
             }
           },
@@ -5205,6 +5494,11 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Hay dos butacas vendidas\", function () {",
+                  "  const mapa = pm.response.json();",
+                  "  pm.expect(mapa.vendidas).to.eql(2);",
+                  "  pm.expect(mapa.butacas.filter((butaca) => butaca.ocupada)).to.have.lengthOf(2);",
                   "});"
                 ]
               }
@@ -5213,7 +5507,55 @@
           "response": []
         },
         {
-          "name": "Crear en ordenes",
+          "name": "Error: comprar una butaca ya vendida (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenCliente}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ordenes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ordenes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entradas\": [\n    { \"funcionId\": {{ordenFuncionId}}, \"butacaId\": {{ordenButacaA}} }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: comprar sin token (401)",
           "request": {
             "method": "POST",
             "header": [
@@ -5233,7 +5575,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{}",
+              "raw": "{\n  \"productos\": [\n    {\n      \"productoId\": 1,\n      \"cantidad\": 1\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -5247,8 +5589,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 201\", function () {",
-                  "  pm.response.to.have.status(201);",
+                  "pm.test(\"Responde 401\", function () {",
+                  "  pm.response.to.have.status(401);",
                   "});"
                 ]
               }
@@ -5257,23 +5599,26 @@
           "response": []
         },
         {
-          "name": "Actualizar en ordenes",
+          "name": "Error: comprar sin entradas ni productos (400)",
           "request": {
-            "method": "PATCH",
+            "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenCliente}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/ordenes/1",
+              "raw": "{{baseUrl}}/ordenes",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "ordenes",
-                "1"
+                "ordenes"
               ]
             },
             "body": {
@@ -5292,8 +5637,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 200\", function () {",
-                  "  pm.response.to.have.status(200);",
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
                   "});"
                 ]
               }
@@ -5302,18 +5647,373 @@
           "response": []
         },
         {
-          "name": "Eliminar de ordenes",
+          "name": "Error: comprar con una cantidad de 11 (400)",
           "request": {
-            "method": "DELETE",
-            "header": [],
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenCliente}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{baseUrl}}/ordenes/1",
+              "raw": "{{baseUrl}}/ordenes",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "ordenes",
-                "1"
+                "ordenes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productos\": [\n    {\n      \"productoId\": 1,\n      \"cantidad\": 11\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: comprar un producto inexistente (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenCliente}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ordenes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ordenes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productos\": [\n    {\n      \"productoId\": 999999,\n      \"cantidad\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: comprar en una funcion inexistente (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenCliente}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ordenes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ordenes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entradas\": [\n    { \"funcionId\": 999999, \"butacaId\": {{ordenButacaA}} }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: comprar una butaca de otra sala (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenCliente}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ordenes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ordenes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entradas\": [\n    { \"funcionId\": {{ordenFuncionId}}, \"butacaId\": 1 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: comprar la misma butaca dos veces en la misma orden (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenCliente}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ordenes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ordenes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entradas\": [\n    { \"funcionId\": 1, \"butacaId\": 1 },\n    { \"funcionId\": 1, \"butacaId\": 1 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Crear una funcion que ya empezo (administrador)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/funciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"peliculaId\": 3,\n  \"salaId\": 10,\n  \"iniciaEn\": \"{{ordenIniciaEn}}\",\n  \"formato\": \"3D\",\n  \"idioma\": \"Castellano\",\n  \"precio\": 9000.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const dias = 400 + Math.floor(Math.random() * 3000);",
+                  "const minutos = Math.floor(Math.random() * 1440);",
+                  "pm.collectionVariables.set(\"ordenIniciaEn\", new Date(Date.now() - dias * 86400000 + minutos * 60000).toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Guarda el id de la función\", function () {",
+                  "  pm.collectionVariables.set(\"ordenFuncionPasadaId\", pm.response.json().id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: comprar en una funcion que ya empezo (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenCliente}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ordenes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ordenes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entradas\": [\n    { \"funcionId\": {{ordenFuncionPasadaId}}, \"butacaId\": {{ordenButacaA}} }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Eliminar la funcion que ya empezo",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/funciones/{{ordenFuncionPasadaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones",
+                "{{ordenFuncionPasadaId}}"
               ]
             }
           },
