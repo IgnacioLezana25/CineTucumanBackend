@@ -330,9 +330,9 @@ Todos los módulos leen y escriben en la base de datos.
 | `GET /peliculas` | Lista las películas. Filtros opcionales: `estado` (`en-cartelera` o `proximamente`), `destacada` (`true` o `false`) y `q` (texto dentro del título) | 200; 400 si un filtro no es válido |
 | `GET /peliculas/:id` | Una película por su número | 200; 400 si `:id` no es un número; 404 si no existe |
 | `GET /peliculas/slug/:slug` | Una película por su `slug`, como el que usa el sitio en la dirección (`/peliculas/toy-story-5`) | 200; 404 si no existe |
-| `POST /peliculas` | Crea una película con `CreatePeliculaDto`, con su reparto opcional (hasta 30 actores, sin nombres repetidos) | 201; 400 si falta un dato, un dato no es válido o la clasificación o un género no existen; 409 si el `slug` ya existe |
-| `PATCH /peliculas/:id` | Modifica solo los campos que se envían. Si se envía `generoIds`, reemplaza todos los géneros; con `[]` los quita. Con `reparto` pasa lo mismo con los actores. Con `null` se vacían los campos opcionales | 200; 400; 404; 409 |
-| `DELETE /peliculas/:id` | Elimina la película y devuelve lo que eliminó | 200; 404; 409 si tiene funciones |
+| `POST /peliculas` | Crea una película con `CreatePeliculaDto`, con su reparto opcional (hasta 30 actores, sin nombres repetidos) | 201; 400 si falta un dato, un dato no es válido o la clasificación o un género no existen; 409 si el `slug` ya existe; 401 sin token; 403 si no es administrador |
+| `PATCH /peliculas/:id` | Modifica solo los campos que se envían. Si se envía `generoIds`, reemplaza todos los géneros; con `[]` los quita. Con `reparto` pasa lo mismo con los actores. Con `null` se vacían los campos opcionales | 200; 400; 404; 409; 401 sin token; 403 si no es administrador |
+| `DELETE /peliculas/:id` | Elimina la película y devuelve lo que eliminó | 200; 404; 409 si tiene funciones; 401 sin token; 403 si no es administrador |
 
 Cada película se devuelve así:
 
@@ -387,9 +387,9 @@ Listas de solo lectura para armar los formularios (por ejemplo, los géneros y l
 | `GET /funciones` | Lista las funciones ordenadas por fecha y hora. Filtros opcionales: `peliculaId`, `sucursalId`, `salaId`, `fecha` (`AAAA-MM-DD`, día de Tucumán), `formato` (`2D` o `3D`) y `proximas` (`true` trae solo las que todavía no empezaron) | 200; 400 si un filtro no es válido |
 | `GET /funciones/:id` | Una función por su número | 200; 400; 404 |
 | `GET /funciones/:id/butacas` | Todas las butacas de la sala de la función, con cuáles están ocupadas | 200; 400; 404 |
-| `POST /funciones` | Crea una función con `CreateFuncionDto` | 201; 400 si un dato no es válido o la película o la sala no existen; 409 si la sala ya tiene una función a esa hora |
-| `PATCH /funciones/:id` | Modifica los campos que se envían | 200; 400; 404; 409 si hay un choque de horario o si se cambia la sala de una función que ya vendió entradas |
-| `DELETE /funciones/:id` | Elimina la función y devuelve lo que eliminó | 200; 404; 409 si tiene entradas vendidas |
+| `POST /funciones` | Crea una función con `CreateFuncionDto` | 201; 400 si un dato no es válido o la película o la sala no existen; 409 si la sala ya tiene una función a esa hora; 401 sin token; 403 si no es administrador |
+| `PATCH /funciones/:id` | Modifica los campos que se envían | 200; 400; 404; 409 si hay un choque de horario o si se cambia la sala de una función que ya vendió entradas; 401 sin token; 403 si no es administrador |
+| `DELETE /funciones/:id` | Elimina la función y devuelve lo que eliminó | 200; 404; 409 si tiene entradas vendidas; 401 sin token; 403 si no es administrador |
 
 `iniciaEn` se envía con fecha, hora y zona horaria (por ejemplo `2026-11-20T19:20:00-03:00`); sin la zona la API responde 400.
 
@@ -439,9 +439,9 @@ Listas de solo lectura para armar los formularios (por ejemplo, los géneros y l
 | `GET /sucursales` | Lista las sucursales. Filtro opcional: `destacada` (`true` o `false`) | 200; 400 si el filtro no es válido |
 | `GET /sucursales/:id` | Una sucursal por su número | 200; 400 si `:id` no es un número; 404 |
 | `GET /sucursales/slug/:slug` | Una sucursal por su `slug` | 200; 404 |
-| `POST /sucursales` | Crea una sucursal con `CreateSucursalDto`, con sus enlaces | 201; 400 si un dato no es válido (por ejemplo, un enlace sin `https://`) o la ciudad no existe; 409 si el `slug` ya existe |
-| `PATCH /sucursales/:id` | Modifica los campos que se envían. Si se envía `enlaces`, reemplaza todos los enlaces; con `[]` los quita | 200; 400; 404; 409 |
-| `DELETE /sucursales/:id` | Elimina la sucursal con sus salas y sus enlaces, y devuelve lo que eliminó | 200; 404; 409 si alguna de sus salas tiene funciones |
+| `POST /sucursales` | Crea una sucursal con `CreateSucursalDto`, con sus enlaces | 201; 400 si un dato no es válido (por ejemplo, un enlace sin `https://`) o la ciudad no existe; 409 si el `slug` ya existe; 401 sin token; 403 si no es administrador |
+| `PATCH /sucursales/:id` | Modifica los campos que se envían. Si se envía `enlaces`, reemplaza todos los enlaces; con `[]` los quita | 200; 400; 404; 409; 401 sin token; 403 si no es administrador |
+| `DELETE /sucursales/:id` | Elimina la sucursal con sus salas y sus enlaces, y devuelve lo que eliminó | 200; 404; 409 si alguna de sus salas tiene funciones; 401 sin token; 403 si no es administrador |
 
 ```json
 {
@@ -502,7 +502,7 @@ Todas las rutas piden el token (401 si falta o no es válido).
 | `PATCH /users/:id` | El propio usuario o un administrador | Modifica `nombre`, `apellido`, `contrasena` o `rol`. Un cliente que cambia su contraseña debe enviar también `contrasenaActual`; el `rol` solo lo cambia un administrador | 200; 400 si un dato no es válido o falta `contrasenaActual`; 401 si `contrasenaActual` no coincide; 403; 404 |
 | `DELETE /users/:id` | Administrador | Elimina el usuario y devuelve lo que eliminó | 200; 403; 404; 409 si tiene órdenes |
 
-Por ahora los permisos de administrador se aplican solo a `/users` y a las órdenes de otras personas: las rutas que crean, modifican o eliminan películas, funciones, sucursales y productos siguen abiertas, hasta que se conecte el panel de administración.
+Los permisos de administrador de las demás rutas están en la sección «Permisos».
 
 ### Productos
 
@@ -511,9 +511,9 @@ Por ahora los permisos de administrador se aplican solo a `/users` y a las órde
 | `GET /productos` | Lista los productos del Candy Bar. Filtros opcionales: `categoria` (`combo`, `snack` o `bebida`) y `activo` (`true` o `false`) | 200; 400 si un filtro no es válido |
 | `GET /productos/:id` | Un producto por su número | 200; 400; 404 |
 | `GET /productos/slug/:slug` | Un producto por su `slug` | 200; 404 |
-| `POST /productos` | Crea un producto con `CreateProductoDto` | 201; 400 si un dato no es válido (precio negativo o con más de dos decimales, categoría inexistente, `activo` que no es `true` o `false`); 409 si el `slug` ya existe |
-| `PATCH /productos/:id` | Modifica los campos que se envían | 200; 400; 404; 409 |
-| `DELETE /productos/:id` | Elimina el producto y devuelve lo que eliminó | 200; 404; 409 si figura en órdenes (en ese caso se desactiva con `"activo": false`) |
+| `POST /productos` | Crea un producto con `CreateProductoDto` | 201; 400 si un dato no es válido (precio negativo o con más de dos decimales, categoría inexistente, `activo` que no es `true` o `false`); 409 si el `slug` ya existe; 401 sin token; 403 si no es administrador |
+| `PATCH /productos/:id` | Modifica los campos que se envían | 200; 400; 404; 409; 401 sin token; 403 si no es administrador |
+| `DELETE /productos/:id` | Elimina el producto y devuelve lo que eliminó | 200; 404; 409 si figura en órdenes (en ese caso se desactiva con `"activo": false`); 401 sin token; 403 si no es administrador |
 
 ```json
 {
@@ -593,13 +593,27 @@ El usuario sale del token y los precios, de la base: si el cuerpo trae `usuarioI
 
 `posterUrl` se arma con `API_BASE_URL` y apunta a un archivo de `public/imagenes/peliculas/`, que la API sirve directamente. `posterArchivo` es el nombre que se guarda en la base y el que se envía al crear o editar una película. Las sucursales funcionan igual con `imagenArchivo` e `imagenUrl`, con los archivos de `public/imagenes/sucursales/`, y el reparto con `fotoArchivo` y `fotoUrl`, con los de `public/imagenes/reparto/`.
 
+## Permisos
+
+Cada ruta es pública, pide el token de cualquier usuario o pide el token de un administrador. El token se envía en `Authorization: Bearer <access_token>` (ver *Autenticación*).
+
+| Rutas | Quién puede usarlas |
+|---|---|
+| `GET` de `/peliculas`, `/funciones` (incluida `/funciones/:id/butacas`), `/sucursales`, `/productos` y `/catalogos`; `POST /auth/register` y `POST /auth/login` | Todos, sin token |
+| `GET /auth/perfil` y las rutas de `/ordenes` | Cualquier usuario con token (cada uno ve solo lo suyo; el administrador ve todo) |
+| `GET /users/:id` y `PATCH /users/:id` | El propio usuario o un administrador |
+| `GET /users` y `DELETE /users/:id` | Solo un administrador |
+| `POST`, `PATCH` y `DELETE` de `/peliculas`, `/funciones`, `/sucursales` y `/productos` | Solo un administrador |
+
+Estas últimas responden **401** si falta el token, venció o no es válido, y **403** si el token es de un cliente. Los permisos se revisan antes que el cuerpo del pedido, así que un cliente recibe 403 aunque los datos sean inválidos. Los demás códigos de cada módulo (400, 404, 409) no cambian.
+
 ## Pruebas de la API con Postman
 
 En [`docs/postman/`](docs/postman) están la colección y el entorno:
 
 1. En Postman, **Import** y elegir `CineTucuman.postman_collection.json` y `CineTucuman.postman_environment.json`.
 2. Elegir el entorno **Cine Tucumán · local** (define `baseUrl` como `http://localhost:4000`; hay que cambiarla si el puerto del `.env` es otro).
-3. Con el servidor andando y la base cargada con los datos de ejemplo, ejecutar la colección: tiene una carpeta por módulo con sus peticiones, y cada una comprueba el código de respuesta. Las carpetas `auth` y `users` guardan solas el token que devuelve el login (variables `tokenCliente` y `tokenAdmin` de la colección) y lo usan en las peticiones siguientes. Las carpetas `peliculas`, `funciones`, `sucursales` y `productos` incluyen además los filtros, la búsqueda por `slug` y los casos de error (400, 404 y 409). Cada carpeta se ejecuta completa y en orden: crea un registro de prueba, lo modifica y lo elimina, así que la base queda como estaba. La carpeta `ordenes` crea su propia función lejana en el tiempo (así no depende de las fechas de los datos de ejemplo), compra, consulta y cancela, y elimina la función; como una orden no se puede eliminar, cada corrida deja una orden `cancelada` en la base.
+3. Con el servidor andando y la base cargada con los datos de ejemplo, ejecutar la colección: tiene una carpeta por módulo con sus peticiones, y cada una comprueba el código de respuesta. Las carpetas `auth` y `users` guardan solas el token que devuelve el login (variables `tokenCliente` y `tokenAdmin` de la colección) y lo usan en las peticiones siguientes. Las carpetas `peliculas`, `funciones`, `sucursales` y `productos` inician sesión por su cuenta como administrador (para crear, modificar y eliminar) y como cliente, comprueban los 401 y 403 de esas rutas, e incluyen además los filtros, la búsqueda por `slug` y los casos de error (400, 404 y 409). Cada carpeta se ejecuta completa y en orden: crea un registro de prueba, lo modifica y lo elimina, así que la base queda como estaba. La carpeta `ordenes` crea su propia función lejana en el tiempo (así no depende de las fechas de los datos de ejemplo), compra, consulta y cancela, y elimina la función; como una orden no se puede eliminar, cada corrida deja una orden `cancelada` en la base.
 
 ## Estrategia de ramas
 
@@ -617,6 +631,5 @@ Cada rama sale de `dev`. Los cambios entran por un pull request con base `dev`, 
 ## Próximas etapas
 
 - Conviene mantener fija la versión 7.10.1 de `prisma`: la etiqueta `latest` del paquete apunta hoy a un candidato de la versión 8.
-- Proteger con el rol de administrador las rutas que crean, modifican o eliminan películas, funciones, sucursales y productos.
 - Subida de pósters nuevos desde el panel de administración.
 - Conectar el frontend a esta API en lugar de sus datos locales.
