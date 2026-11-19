@@ -268,7 +268,7 @@ src/
     app/             Módulo raíz: reúne a los demás
     prisma/          Conexión con la base de datos (global)
     catalogos/       Géneros, clasificaciones y ciudades (solo lectura)
-    comunes/         Utilidades compartidas, como armar la URL pública de una imagen
+    comunes/         Utilidades compartidas, como armar la URL pública de una imagen o pasar un instante a la fecha y la hora de Tucumán
     auth/            Registro e inicio de sesión
     users/           Usuarios
     peliculas/       Películas
@@ -289,13 +289,13 @@ Cada módulo tiene las cinco rutas que genera Nest, con su nombre como prefijo: 
 | `auth` | `/auth` | Estructura generada |
 | `users` | `/users` | Estructura generada |
 | `peliculas` | `/peliculas` | Conectado con la base de datos mediante Prisma |
-| `funciones` | `/funciones` | Estructura generada |
+| `funciones` | `/funciones` | Conectado con la base de datos mediante Prisma |
 | `sucursales` | `/sucursales` | Conectado con la base de datos mediante Prisma |
 | `productos` | `/productos` | Conectado con la base de datos mediante Prisma |
-| `catalogos` | `/catalogos` | Solo lectura, con Prisma |
+| `catalogos` | `/catalogos` | Solo lectura, con Prisma (géneros, clasificaciones, ciudades y salas) |
 | `ordenes` | `/ordenes` | Estructura generada |
 
-Las rutas de `peliculas`, `sucursales`, `productos` y `catalogos` ya leen y escriben en la base de datos. Las de los demás módulos todavía devuelven un texto de ejemplo: se conectan en las próximas etapas.
+Las rutas de `peliculas`, `funciones`, `sucursales`, `productos` y `catalogos` ya leen y escriben en la base de datos. Las de los demás módulos todavía devuelven un texto de ejemplo: se conectan en las próximas etapas.
 
 ### Películas
 
@@ -342,6 +342,59 @@ Listas de solo lectura para armar los formularios (por ejemplo, los géneros y l
 | `GET /catalogos/generos` | `[{ "id": 1, "nombre": "Acción" }]`, ordenados por nombre |
 | `GET /catalogos/clasificaciones` | `[{ "id": 1, "nombre": "ATP" }]` |
 | `GET /catalogos/ciudades` | `[{ "id": 2, "nombre": "Yerba Buena", "provincia": "Tucumán" }]`, ordenadas por nombre |
+| `GET /catalogos/salas` | `[{ "id": 3, "sucursalId": 2, "sucursal": "Cine Atlas Vía 24", "nombre": "Sala 1", "capacidad": 48 }]`. Filtro opcional: `sucursalId` (400 si no es un número entero positivo) |
+
+### Funciones
+
+| Ruta | Qué hace | Respuestas |
+|---|---|---|
+| `GET /funciones` | Lista las funciones ordenadas por fecha y hora. Filtros opcionales: `peliculaId`, `sucursalId`, `salaId`, `fecha` (`AAAA-MM-DD`, día de Tucumán), `formato` (`2D` o `3D`) y `proximas` (`true` trae solo las que todavía no empezaron) | 200; 400 si un filtro no es válido |
+| `GET /funciones/:id` | Una función por su número | 200; 400; 404 |
+| `GET /funciones/:id/butacas` | Todas las butacas de la sala de la función, con cuáles están ocupadas | 200; 400; 404 |
+| `POST /funciones` | Crea una función con `CreateFuncionDto` | 201; 400 si un dato no es válido o la película o la sala no existen; 409 si la sala ya tiene una función a esa hora |
+| `PATCH /funciones/:id` | Modifica los campos que se envían | 200; 400; 404; 409 si hay un choque de horario o si se cambia la sala de una función que ya vendió entradas |
+| `DELETE /funciones/:id` | Elimina la función y devuelve lo que eliminó | 200; 404; 409 si tiene entradas vendidas |
+
+`iniciaEn` se envía con fecha, hora y zona horaria (por ejemplo `2026-11-20T19:20:00-03:00`); sin la zona la API responde 400.
+
+```json
+{
+  "id": 6,
+  "peliculaId": 3,
+  "pelicula": "Spider-Man: Un nuevo día",
+  "salaId": 9,
+  "sala": "Sala 1",
+  "sucursalId": 5,
+  "sucursal": "Sunstar Cinemas",
+  "iniciaEn": "2026-11-20T22:20:00.000Z",
+  "fecha": "2026-11-20",
+  "horario": "19:20",
+  "formato": "2D",
+  "idioma": "Castellano",
+  "precio": 8500,
+  "capacidad": 48,
+  "vendidas": 2,
+  "estado": "disponible"
+}
+```
+
+`fecha` y `horario` son la fecha y la hora en Tucumán (UTC-3), listas para mostrar. `capacidad` es la cantidad de butacas de la sala y `vendidas` la cantidad de entradas. `estado` se calcula con la misma regla de la vista `v_funciones`: `agotada` si no queda ninguna butaca, `pocos-lugares` si se vendió el 80 % o más y `disponible` en los demás casos. `precio` es un número.
+
+`GET /funciones/:id/butacas` devuelve, ordenadas por fila y número:
+
+```json
+{
+  "funcionId": 6,
+  "salaId": 9,
+  "sala": "Sala 1",
+  "capacidad": 48,
+  "vendidas": 2,
+  "butacas": [
+    { "id": 385, "codigo": "A1", "fila": "A", "numero": 1, "accesible": true, "ocupada": false },
+    { "id": 398, "codigo": "B3", "fila": "B", "numero": 3, "accesible": false, "ocupada": true }
+  ]
+}
+```
 
 ### Sucursales
 
@@ -408,7 +461,7 @@ En [`docs/postman/`](docs/postman) están la colección y el entorno:
 
 1. En Postman, **Import** y elegir `CineTucuman.postman_collection.json` y `CineTucuman.postman_environment.json`.
 2. Elegir el entorno **Cine Tucumán · local** (define `baseUrl` como `http://localhost:4000`; hay que cambiarla si el puerto del `.env` es otro).
-3. Con el servidor andando, ejecutar la colección: tiene una carpeta por módulo con sus peticiones, y cada una comprueba el código de respuesta. Las carpetas `peliculas`, `sucursales` y `productos` incluyen además los filtros, la búsqueda por `slug` y los casos de error (400, 404 y 409). Cada carpeta se ejecuta completa y en orden: crea un registro de prueba, lo modifica y lo elimina, así que la base queda como estaba.
+3. Con el servidor andando, ejecutar la colección: tiene una carpeta por módulo con sus peticiones, y cada una comprueba el código de respuesta. Las carpetas `peliculas`, `funciones`, `sucursales` y `productos` incluyen además los filtros, la búsqueda por `slug` y los casos de error (400, 404 y 409). Cada carpeta se ejecuta completa y en orden: crea un registro de prueba, lo modifica y lo elimina, así que la base queda como estaba.
 
 ## Estrategia de ramas
 
@@ -425,7 +478,7 @@ Cada rama sale de `dev`. Los cambios entran por un pull request con base `dev`, 
 
 ## Próximas etapas
 
-- Conectar con Prisma los módulos que faltan: funciones (con las butacas ocupadas de cada una) y órdenes. Conviene mantener fija la versión 7.10.1 de `prisma`: la etiqueta `latest` del paquete apunta hoy a un candidato de la versión 8.
+- Conectar con Prisma el módulo que falta: órdenes (con el precio calculado por el servidor y las butacas de cada entrada). Conviene mantener fija la versión 7.10.1 de `prisma`: la etiqueta `latest` del paquete apunta hoy a un candidato de la versión 8.
 - Registro e inicio de sesión con usuarios reales (`auth` y `users`).
 - Subida de pósters nuevos desde el panel de administración.
 - Conectar el frontend a esta API en lugar de sus datos locales.
