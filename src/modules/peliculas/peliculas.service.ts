@@ -7,6 +7,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '../../generated/prisma/client.js';
 import { urlBaseDeLaApi, urlDeImagen } from '../comunes/url-publica.util.js';
+import { ArchivoSubido } from '../imagenes/archivo-subido.types.js';
+import { ImagenesService } from '../imagenes/imagenes.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   PRISMA_CLAVE_FORANEA,
@@ -35,6 +37,7 @@ export class PeliculasService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly imagenes: ImagenesService,
     configuracion: ConfigService,
   ) {
     this.urlBase = urlBaseDeLaApi(configuracion);
@@ -154,12 +157,52 @@ export class PeliculasService {
     }
   }
 
+  async subirPoster(id: number, archivo?: ArchivoSubido): Promise<Pelicula> {
+    const pelicula = await this.prisma.pelicula.findUnique({
+      where: { id },
+      include: INCLUIR_RELACIONES,
+    });
+
+    if (!pelicula) {
+      throw new NotFoundException(`No existe una película con id ${id}.`);
+    }
+
+    const posterNuevo = await this.imagenes.guardar(
+      'peliculas',
+      pelicula.slug,
+      archivo,
+    );
+    let actualizada: PeliculaConRelaciones;
+
+    try {
+      actualizada = await this.prisma.pelicula.update({
+        where: { id },
+        data: { posterArchivo: posterNuevo },
+        include: INCLUIR_RELACIONES,
+      });
+    } catch (error) {
+      await this.imagenes.eliminar('peliculas', posterNuevo);
+
+      if (codigoDeError(error) === PRISMA_NO_ENCONTRADO) {
+        throw new NotFoundException(`No existe una película con id ${id}.`);
+      }
+
+      throw error;
+    }
+
+    await this.imagenes.eliminar('peliculas', pelicula.posterArchivo);
+
+    return this.presentar(actualizada);
+  }
+
   async remove(id: number): Promise<Pelicula> {
     try {
       const pelicula = await this.prisma.pelicula.delete({
         where: { id },
         include: INCLUIR_RELACIONES,
       });
+
+      await this.imagenes.eliminar('peliculas', pelicula.posterArchivo);
 
       return this.presentar(pelicula);
     } catch (error) {

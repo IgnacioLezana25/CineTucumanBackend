@@ -3,12 +3,19 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseIntPipe,
   Patch,
   Post,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { ArchivoSubido } from '../imagenes/archivo-subido.types.js';
+import { OPCIONES_DE_SUBIDA } from '../imagenes/opciones-de-subida.js';
 import { SoloAdministrador } from '../auth/decorators/solo-administrador.decorator.js';
 import { SucursalesService } from './sucursales.service.js';
 import { CreateSucursalDto } from './dto/create-sucursal.dto.js';
@@ -23,6 +30,17 @@ export class SucursalesController {
   @SoloAdministrador()
   create(@Body() createSucursalDto: CreateSucursalDto) {
     return this.sucursalesService.create(createSucursalDto);
+  }
+
+  @Post(':id/imagen')
+  @SoloAdministrador()
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('archivo', OPCIONES_DE_SUBIDA))
+  subirImagen(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() archivo?: ArchivoSubido,
+  ) {
+    return this.sucursalesService.subirImagen(id, archivo);
   }
 
   @Get()
