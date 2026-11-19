@@ -416,7 +416,7 @@
     },
     {
       "name": "peliculas",
-      "description": "Módulo peliculas (películas). Las cinco rutas las generó nest g resource; por ahora devuelven un texto de ejemplo y todavía no se conectan a la base de datos.",
+      "description": "Módulo peliculas, conectado a la base de datos con Prisma. Ejecutar la carpeta completa en orden: la petición «Crear una pelicula» guarda el id en la variable peliculaId, que usan las siguientes, y la última lo elimina. Las peticiones «Error: …» comprueban los códigos 400, 404 y 409.",
       "item": [
         {
           "name": "Listar peliculas",
@@ -441,6 +441,11 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Devuelve una lista con posterUrl\", function () {",
+                  "  const peliculas = pm.response.json();",
+                  "  pm.expect(peliculas).to.be.an(\"array\").that.is.not.empty;",
+                  "  pm.expect(peliculas[0].posterUrl).to.include(\"/imagenes/peliculas/\");",
                   "});"
                 ]
               }
@@ -449,7 +454,124 @@
           "response": []
         },
         {
-          "name": "Ver un registro de peliculas",
+          "name": "Listar peliculas en cartelera",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas?estado=en-cartelera",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas"
+              ],
+              "query": [
+                {
+                  "key": "estado",
+                  "value": "en-cartelera"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Todas están en cartelera\", function () {",
+                  "  pm.response.json().forEach((pelicula) => pm.expect(pelicula.estado).to.eql(\"en-cartelera\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Listar peliculas destacadas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas?destacada=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas"
+              ],
+              "query": [
+                {
+                  "key": "destacada",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Todas son destacadas\", function () {",
+                  "  pm.response.json().forEach((pelicula) => pm.expect(pelicula.destacada).to.eql(true));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Buscar peliculas por titulo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas?q=toy",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "toy"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"El título contiene el texto buscado\", function () {",
+                  "  pm.response.json().forEach((pelicula) => pm.expect(pelicula.titulo.toLowerCase()).to.include(\"toy\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Ver una pelicula por id",
           "request": {
             "method": "GET",
             "header": [],
@@ -472,6 +594,11 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Trae clasificación y géneros\", function () {",
+                  "  const pelicula = pm.response.json();",
+                  "  pm.expect(pelicula.id).to.eql(1);",
+                  "  pm.expect(pelicula.generos).to.be.an(\"array\");",
                   "});"
                 ]
               }
@@ -480,7 +607,42 @@
           "response": []
         },
         {
-          "name": "Crear en peliculas",
+          "name": "Ver una pelicula por slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas/slug/toy-story-5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas",
+                "slug",
+                "toy-story-5"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Es la película pedida\", function () {",
+                  "  pm.expect(pm.response.json().slug).to.eql(\"toy-story-5\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Crear una pelicula",
           "request": {
             "method": "POST",
             "header": [
@@ -500,7 +662,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{}",
+              "raw": "{\n  \"slug\": \"prueba-{{$timestamp}}\",\n  \"titulo\": \"Película de prueba\",\n  \"tituloOriginal\": \"Test movie\",\n  \"sinopsis\": \"Una película creada desde Postman.\",\n  \"duracionMinutos\": 95,\n  \"clasificacionId\": 1,\n  \"estado\": \"proximamente\",\n  \"destacada\": false,\n  \"fechaEstreno\": \"2026-12-24\",\n  \"posterArchivo\": \"toy-story-5.jpg\",\n  \"director\": \"Dirección de prueba\",\n  \"paisOrigen\": \"Argentina\",\n  \"generoIds\": [\n    1,\n    2\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -516,6 +678,11 @@
                 "exec": [
                   "pm.test(\"Responde 201\", function () {",
                   "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Guarda el id para las siguientes peticiones\", function () {",
+                  "  const pelicula = pm.response.json();",
+                  "  pm.expect(pelicula.id).to.be.a(\"number\");",
+                  "  pm.collectionVariables.set(\"peliculaId\", pelicula.id);",
                   "});"
                 ]
               }
@@ -524,7 +691,7 @@
           "response": []
         },
         {
-          "name": "Actualizar en peliculas",
+          "name": "Actualizar una pelicula",
           "request": {
             "method": "PATCH",
             "header": [
@@ -534,18 +701,18 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/peliculas/1",
+              "raw": "{{baseUrl}}/peliculas/{{peliculaId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "peliculas",
-                "1"
+                "{{peliculaId}}"
               ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{}",
+              "raw": "{\n  \"titulo\": \"Título editado\",\n  \"sinopsis\": null\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -561,6 +728,11 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Cambia solo lo enviado\", function () {",
+                  "  const pelicula = pm.response.json();",
+                  "  pm.expect(pelicula.titulo).to.eql(\"Título editado\");",
+                  "  pm.expect(pelicula.duracionMinutos).to.eql(95);",
                   "});"
                 ]
               }
@@ -569,7 +741,325 @@
           "response": []
         },
         {
-          "name": "Eliminar de peliculas",
+          "name": "Reemplazar los generos de una pelicula",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas/{{peliculaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas",
+                "{{peliculaId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"generoIds\": [\n    3,\n    5\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Quedan los géneros nuevos\", function () {",
+                  "  pm.expect(pm.response.json().generoIds).to.eql([3, 5]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con un slug repetido (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"toy-story-5\",\n  \"titulo\": \"Repetida\",\n  \"estado\": \"proximamente\",\n  \"posterArchivo\": \"toy-story-5.jpg\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear sin titulo (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"sin-titulo\",\n  \"estado\": \"proximamente\",\n  \"posterArchivo\": \"toy-story-5.jpg\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con un estado invalido (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"estado-invalido\",\n  \"titulo\": \"Estado inválido\",\n  \"estado\": \"cualquiera\",\n  \"posterArchivo\": \"toy-story-5.jpg\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con una clasificacion inexistente (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"sin-clasificacion\",\n  \"titulo\": \"Sin clasificación\",\n  \"estado\": \"proximamente\",\n  \"posterArchivo\": \"toy-story-5.jpg\",\n  \"clasificacionId\": 999\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: id que no es un numero (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas",
+                "abc"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: pelicula inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas/99999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas",
+                "99999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: slug inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas/slug/no-existe",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas",
+                "slug",
+                "no-existe"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: eliminar una pelicula con funciones (409)",
           "request": {
             "method": "DELETE",
             "header": [],
@@ -590,8 +1080,73 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "pm.test(\"Responde 409\", function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Eliminar la pelicula creada",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas/{{peliculaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas",
+                "{{peliculaId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Devuelve la película eliminada\", function () {",
+                  "  pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"peliculaId\")));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: eliminar de nuevo (404)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/peliculas/{{peliculaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "peliculas",
+                "{{peliculaId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () {",
+                  "  pm.response.to.have.status(404);",
                   "});"
                 ]
               }

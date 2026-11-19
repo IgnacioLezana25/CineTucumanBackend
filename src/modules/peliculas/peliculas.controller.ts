@@ -1,14 +1,17 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  Controller,
   Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
 } from '@nestjs/common';
 import { PeliculasService } from './peliculas.service.js';
 import { CreatePeliculaDto } from './dto/create-pelicula.dto.js';
+import { FiltrarPeliculasDto } from './dto/filtrar-peliculas.dto.js';
 import { UpdatePeliculaDto } from './dto/update-pelicula.dto.js';
 
 @Controller('peliculas')
@@ -21,25 +24,30 @@ export class PeliculasController {
   }
 
   @Get()
-  findAll() {
-    return this.peliculasService.findAll();
+  findAll(@Query() filtros: FiltrarPeliculasDto) {
+    return this.peliculasService.findAll(filtros);
+  }
+
+  @Get('slug/:slug')
+  findBySlug(@Param('slug') slug: string) {
+    return this.peliculasService.findBySlug(slug);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.peliculasService.findOne(+id);
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.peliculasService.findOne(id);
   }
 
   @Patch(':id')
   update(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() updatePeliculaDto: UpdatePeliculaDto,
   ) {
-    return this.peliculasService.update(+id, updatePeliculaDto);
+    return this.peliculasService.update(id, updatePeliculaDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.peliculasService.remove(+id);
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.peliculasService.remove(id);
   }
 }

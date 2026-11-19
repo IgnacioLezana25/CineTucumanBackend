@@ -16,7 +16,7 @@ API del proyecto Cine Tucumán, hecha con [NestJS](https://nestjs.com/). Reempla
 - NestJS 12 y TypeScript, con módulos ES.
 - PostgreSQL como base de datos relacional, normalizada hasta la 3FN.
 - `class-validator` y `class-transformer` para validar los datos que llegan en las peticiones.
-- Prisma (`@prisma/client` y `prisma`, versión 7.10.1) para conectar la API con la base en la próxima etapa.
+- Prisma 7.10.1 (`prisma`, `@prisma/client` y el adaptador `@prisma/adapter-pg`) para conectar la API con la base de datos.
 - `@nestjs/config` para las variables de entorno.
 - Vitest para las pruebas y oxlint para el análisis del código.
 - Postman para probar y documentar las rutas.
@@ -32,7 +32,7 @@ npm install
 npm run start:dev
 ```
 
-Antes de levantar el servidor hay que crear el archivo `.env` (ver la sección siguiente). La API queda escuchando en el puerto que diga ese archivo y lo avisa al arrancar.
+`npm install` (y `npm ci`) también ejecuta `prisma generate`, que crea el cliente de Prisma en `src/generated/prisma` (esa carpeta no se sube a GitHub). Antes de levantar el servidor hay que crear la base de datos (sección *Base de datos*) y el archivo `.env` (ver la sección siguiente). La API queda escuchando en el puerto que diga ese archivo y lo avisa al arrancar.
 
 | Comando | Para qué |
 |---|---|
@@ -52,15 +52,17 @@ Se guardan en un archivo `.env` en la raíz del proyecto, que **no se sube a Git
 PORT=4000
 DATABASE_URL=postgresql://usuario:password@localhost:5432/cine_tucuman
 API_BASE_URL=http://localhost:4000/
+FRONTEND_URL=http://localhost:5173
 ```
 
 | Variable | Qué guarda |
 |---|---|
 | `PORT` | El puerto donde escucha la API (si falta, usa el 4000) |
 | `DATABASE_URL` | La conexión a la base de datos PostgreSQL: usuario, contraseña, servidor, puerto y nombre |
-| `API_BASE_URL` | La dirección base de la API, que se muestra al arrancar |
+| `API_BASE_URL` | La dirección base de la API: se muestra al arrancar y se usa para armar la dirección completa de los pósters |
+| `FRONTEND_URL` | Desde dónde se permite llamar a la API (CORS). Si falta, usa `http://localhost:5173`. Admite varias direcciones separadas por coma |
 
-El archivo lo lee `ConfigModule` de `@nestjs/config`, que se registra una sola vez en `AppModule` y queda disponible en todo el proyecto.
+El archivo lo lee `ConfigModule` de `@nestjs/config`, que se registra una sola vez en `AppModule` y queda disponible en todo el proyecto. Prisma lo lee por su cuenta desde `prisma.config.ts`.
 
 ## Validación de los datos
 
@@ -228,15 +230,41 @@ La base está normalizada hasta la **tercera forma normal (3FN)**. [`database/no
 
 Las películas, las sucursales con sus enlaces y el Candy Bar salen del frontend. Lo que el sitio todavía no tiene (por ejemplo, la duración de la mayoría de las películas) queda vacío, igual que el sitio muestra «Por confirmar». Los usuarios, las salas, las funciones y las órdenes son de ejemplo. La contraseña de todos los usuarios de ejemplo es `Prueba123!` y se guarda cifrada con bcrypt.
 
+## Conexión con Prisma
+
+Prisma es la capa que usan los services para leer y escribir en PostgreSQL. La API se conecta con el adaptador `@prisma/adapter-pg` y la dirección de la base sale de `DATABASE_URL`.
+
+| Archivo | Qué hace |
+|---|---|
+| `prisma/schema.prisma` | Describe las 15 tablas como modelos de Prisma. Los nombres de los modelos van en singular (`Pelicula`) y `@@map` y `@map` los enlazan con las tablas y columnas reales (`peliculas`, `poster_archivo`) |
+| `prisma.config.ts` | Le dice a la herramienta de Prisma dónde está el esquema y de dónde sacar `DATABASE_URL` |
+| `prisma/migrations/0_init/` | Migración inicial: es el SQL de `database/schema.sql` sin el borrado de tablas |
+| `src/modules/prisma/` | `PrismaService` (se conecta al arrancar y se desconecta al cerrar) y `PrismaModule`, que es global: cualquier service puede recibir `PrismaService` sin importar el módulo |
+| `src/generated/prisma/` | El cliente que genera Prisma. No se sube a GitHub: se crea con `npm install` o con `npx prisma generate` |
+
+**La base se crea con los scripts SQL** (pasos 1 a 3 de la sección anterior), porque así quedan también las restricciones `CHECK` y las vistas `v_ordenes` y `v_funciones`, que Prisma no genera. Por eso el esquema de Prisma está escrito a mano a partir de esas tablas, y la migración `0_init` es una línea de base: marca el estado en el que ya está la base.
+
+Si se quiere que Prisma registre esa migración como ya aplicada (opcional: la API funciona igual sin hacerlo), con la base ya creada:
+
+```
+npx prisma migrate resolve --applied 0_init
+```
+
+Si se cambia `prisma/schema.prisma`, hay que volver a ejecutar `npx prisma generate`. Para comprobar que el esquema no tiene errores: `npx prisma validate`.
+
 ## Estructura del proyecto
 
 ```
 database/            Scripts SQL (crear la base, esquema, datos, verificación y pruebas) y la normalización
 docs/postman/        Colección y entorno de Postman
+prisma/              Esquema de Prisma y migraciones
+prisma.config.ts     Configuración de la herramienta de Prisma
+public/imagenes/     Archivos que la API sirve por URL (los pósters de las películas)
 src/
-  main.ts            Punto de entrada: crea la aplicación, activa la validación y la pone a escuchar
+  main.ts            Punto de entrada: crea la aplicación, activa la validación y el CORS, sirve las imágenes y la pone a escuchar
   modules/           Todos los módulos del proyecto
     app/             Módulo raíz: reúne a los demás
+    prisma/          Conexión con la base de datos (global)
     auth/            Registro e inicio de sesión
     users/           Usuarios
     peliculas/       Películas
@@ -256,13 +284,51 @@ Cada módulo tiene las cinco rutas que genera Nest, con su nombre como prefijo: 
 |---|---|---|
 | `auth` | `/auth` | Estructura generada |
 | `users` | `/users` | Estructura generada |
-| `peliculas` | `/peliculas` | Estructura generada |
+| `peliculas` | `/peliculas` | Conectado con la base de datos mediante Prisma |
 | `funciones` | `/funciones` | Estructura generada |
 | `sucursales` | `/sucursales` | Estructura generada |
 | `productos` | `/productos` | Estructura generada |
 | `ordenes` | `/ordenes` | Estructura generada |
 
-Por ahora las rutas devuelven un texto de ejemplo: la lógica y la conexión de cada módulo con la base de datos llegan en la próxima etapa.
+Las rutas de `peliculas` ya leen y escriben en la base de datos. Las de los demás módulos todavía devuelven un texto de ejemplo: se conectan en las próximas etapas.
+
+### Películas
+
+| Ruta | Qué hace | Respuestas |
+|---|---|---|
+| `GET /peliculas` | Lista las películas. Filtros opcionales: `estado` (`en-cartelera` o `proximamente`), `destacada` (`true` o `false`) y `q` (texto dentro del título) | 200; 400 si un filtro no es válido |
+| `GET /peliculas/:id` | Una película por su número | 200; 400 si `:id` no es un número; 404 si no existe |
+| `GET /peliculas/slug/:slug` | Una película por su `slug`, como el que usa el sitio en la dirección (`/peliculas/toy-story-5`) | 200; 404 si no existe |
+| `POST /peliculas` | Crea una película con `CreatePeliculaDto` | 201; 400 si falta un dato, un dato no es válido o la clasificación o un género no existen; 409 si el `slug` ya existe |
+| `PATCH /peliculas/:id` | Modifica solo los campos que se envían. Si se envía `generoIds`, reemplaza todos los géneros; con `[]` los quita. Con `null` se vacían los campos opcionales | 200; 400; 404; 409 |
+| `DELETE /peliculas/:id` | Elimina la película y devuelve lo que eliminó | 200; 404; 409 si tiene funciones |
+
+Cada película se devuelve así:
+
+```json
+{
+  "id": 3,
+  "slug": "spider-man-un-nuevo-dia",
+  "titulo": "Spider-Man: Un nuevo día",
+  "tituloOriginal": "Spider-Man: Brand New Day",
+  "sinopsis": "…",
+  "duracionMinutos": 150,
+  "clasificacionId": 5,
+  "clasificacion": "Supervisión parental sugerida",
+  "estado": "en-cartelera",
+  "destacada": true,
+  "fechaEstreno": "2026-07-30",
+  "posterArchivo": "spider-man-un-nuevo-dia.jpg",
+  "posterUrl": "http://localhost:4000/imagenes/peliculas/spider-man-un-nuevo-dia.jpg",
+  "trailerYoutube": "62bIsvRcPv0",
+  "director": "Destin Daniel Cretton",
+  "paisOrigen": "Estados Unidos",
+  "generoIds": [1, 2, 3],
+  "generos": ["Acción", "Aventuras", "Ciencia ficción"]
+}
+```
+
+`posterUrl` se arma con `API_BASE_URL` y apunta a un archivo de `public/imagenes/peliculas/`, que la API sirve directamente. `posterArchivo` es el nombre que se guarda en la base y el que se envía al crear o editar una película.
 
 ## Pruebas de la API con Postman
 
@@ -270,7 +336,7 @@ En [`docs/postman/`](docs/postman) están la colección y el entorno:
 
 1. En Postman, **Import** y elegir `CineTucuman.postman_collection.json` y `CineTucuman.postman_environment.json`.
 2. Elegir el entorno **Cine Tucumán · local** (define `baseUrl` como `http://localhost:4000`; hay que cambiarla si el puerto del `.env` es otro).
-3. Con el servidor andando, ejecutar la colección: tiene una carpeta por módulo con sus cinco peticiones, y cada una comprueba el código de respuesta.
+3. Con el servidor andando, ejecutar la colección: tiene una carpeta por módulo con sus peticiones, y cada una comprueba el código de respuesta. La carpeta `peliculas` incluye además los filtros, la búsqueda por `slug` y los casos de error (400, 404 y 409).
 
 ## Estrategia de ramas
 
@@ -287,8 +353,7 @@ Cada rama sale de `dev`. Los cambios entran por un pull request con base `dev`, 
 
 ## Próximas etapas
 
-- Conectar los módulos con la base de datos usando Prisma, que ya está instalado (`@prisma/client` y `prisma`, versión 7.10.1), a partir del esquema ya creado: `npx prisma db pull` y `npx prisma generate`. Conviene mantener la versión fija: la etiqueta `latest` del paquete `prisma` apunta hoy a un candidato de la versión 8.
-- Validar los dto de cada módulo con los decoradores de `class-validator`.
-- Registro e inicio de sesión con usuarios reales.
-- Lógica de películas, funciones, butacas y compras.
+- Conectar con Prisma los módulos que faltan: sucursales, productos, funciones (con las butacas ocupadas de cada una) y órdenes. Conviene mantener fija la versión 7.10.1 de `prisma`: la etiqueta `latest` del paquete apunta hoy a un candidato de la versión 8.
+- Registro e inicio de sesión con usuarios reales (`auth` y `users`).
+- Subida de pósters nuevos desde el panel de administración.
 - Conectar el frontend a esta API en lugar de sus datos locales.
