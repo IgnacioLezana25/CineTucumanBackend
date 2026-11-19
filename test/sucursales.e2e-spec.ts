@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/modules/app/app.module.js';
@@ -30,6 +31,7 @@ const cuerpoValido = {
 
 describe('Sucursales (e2e)', () => {
   let app: INestApplication<App>;
+  let tokenAdmin: string;
   const sucursal = {
     create: vi.fn(),
     findMany: vi.fn(),
@@ -51,6 +53,12 @@ describe('Sucursales (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe());
     await app.init();
+
+    tokenAdmin = await app.get(JwtService).signAsync({
+      sub: 5,
+      correo: 'admin@test.com',
+      rol: 'admin',
+    });
   });
 
   afterEach(async () => {
@@ -102,6 +110,7 @@ describe('Sucursales (e2e)', () => {
   it('POST /sucursales con un enlace sin https responde 400', async () => {
     await request(app.getHttpServer())
       .post('/sucursales')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({
         ...cuerpoValido,
         enlaces: [{ tipo: 'sitio', url: 'ejemplo.com' }],
@@ -116,6 +125,7 @@ describe('Sucursales (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/sucursales')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({
         ...cuerpoValido,
         referencia: 'Portal de Tucumán Shopping.',
@@ -139,10 +149,12 @@ describe('Sucursales (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/sucursales')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send(cuerpoValido)
       .expect(409);
     await request(app.getHttpServer())
       .post('/sucursales')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send(cuerpoValido)
       .expect(400);
   });
@@ -152,6 +164,7 @@ describe('Sucursales (e2e)', () => {
 
     await request(app.getHttpServer())
       .patch('/sucursales/4')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ enlaces: [] })
       .expect(200);
 
@@ -166,6 +179,7 @@ describe('Sucursales (e2e)', () => {
 
     await request(app.getHttpServer())
       .patch('/sucursales/99')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ nombre: 'Nuevo' })
       .expect(404);
   });
@@ -174,7 +188,13 @@ describe('Sucursales (e2e)', () => {
     sucursal.delete.mockRejectedValueOnce({ code: 'P2003' });
     sucursal.delete.mockResolvedValueOnce(sucursalEnBase);
 
-    await request(app.getHttpServer()).delete('/sucursales/4').expect(409);
-    await request(app.getHttpServer()).delete('/sucursales/4').expect(200);
+    await request(app.getHttpServer())
+      .delete('/sucursales/4')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .expect(409);
+    await request(app.getHttpServer())
+      .delete('/sucursales/4')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .expect(200);
   });
 });

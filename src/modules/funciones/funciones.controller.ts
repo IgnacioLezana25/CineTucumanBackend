@@ -9,6 +9,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { SoloAdministrador } from '../auth/decorators/solo-administrador.decorator.js';
 import { FuncionesService } from './funciones.service.js';
 import { CreateFuncionDto } from './dto/create-funcion.dto.js';
 import { FiltrarFuncionesDto } from './dto/filtrar-funciones.dto.js';
@@ -19,6 +20,7 @@ export class FuncionesController {
   constructor(private readonly funcionesService: FuncionesService) {}
 
   @Post()
+  @SoloAdministrador()
   create(@Body() createFuncionDto: CreateFuncionDto) {
     return this.funcionesService.create(createFuncionDto);
   }
@@ -39,6 +41,7 @@ export class FuncionesController {
   }
 
   @Patch(':id')
+  @SoloAdministrador()
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateFuncionDto: UpdateFuncionDto,
@@ -47,6 +50,7 @@ export class FuncionesController {
   }
 
   @Delete(':id')
+  @SoloAdministrador()
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.funcionesService.remove(id);
   }
