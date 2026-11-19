@@ -11,6 +11,14 @@ export class PrismaService
   constructor(configuracion: ConfigService) {
     const connectionString = configuracion.getOrThrow<string>('DATABASE_URL');
 
+    try {
+      new URL(connectionString);
+    } catch {
+      throw new Error(
+        'DATABASE_URL no es una URL válida. Si la contraseña tiene símbolos como #, / o ?, hay que escribirlos codificados (por ejemplo, # como %23).',
+      );
+    }
+
     super({ adapter: new PrismaPg({ connectionString }) });
   }
 
