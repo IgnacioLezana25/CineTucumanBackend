@@ -1158,7 +1158,7 @@
     },
     {
       "name": "funciones",
-      "description": "Módulo funciones (funciones). Las cinco rutas las generó nest g resource; por ahora devuelven un texto de ejemplo y todavía no se conectan a la base de datos.",
+      "description": "Módulo funciones, conectado a la base de datos con Prisma. Ejecutar la carpeta completa en orden: «Crear una funcion» elige un horario futuro al azar y guarda el id en la variable funcionId, que usan las siguientes, y «Eliminar la funcion creada» la borra. Las peticiones «Error: …» comprueban los códigos 400, 404 y 409; la función 6 tiene entradas vendidas en los datos de ejemplo.",
       "item": [
         {
           "name": "Listar funciones",
@@ -1183,6 +1183,14 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Cada función trae fecha, horario, sala, sucursal y estado\", function () {",
+                  "  const funciones = pm.response.json();",
+                  "  pm.expect(funciones).to.be.an(\"array\").that.is.not.empty;",
+                  "  pm.expect(funciones[0].fecha).to.match(/^\\d{4}-\\d{2}-\\d{2}$/);",
+                  "  pm.expect(funciones[0].horario).to.match(/^\\d{2}:\\d{2}$/);",
+                  "  pm.expect(funciones[0].precio).to.be.a(\"number\");",
+                  "  pm.expect([\"disponible\", \"pocos-lugares\", \"agotada\"]).to.include(funciones[0].estado);",
                   "});"
                 ]
               }
@@ -1191,18 +1199,23 @@
           "response": []
         },
         {
-          "name": "Ver un registro de funciones",
+          "name": "Listar las funciones de una pelicula",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/funciones/1",
+              "raw": "{{baseUrl}}/funciones?peliculaId=3",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "funciones",
-                "1"
+                "funciones"
+              ],
+              "query": [
+                {
+                  "key": "peliculaId",
+                  "value": "3"
+                }
               ]
             }
           },
@@ -1214,6 +1227,11 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Todas son de la película pedida\", function () {",
+                  "  const funciones = pm.response.json();",
+                  "  pm.expect(funciones).to.not.be.empty;",
+                  "  funciones.forEach((funcion) => pm.expect(funcion.peliculaId).to.eql(3));",
                   "});"
                 ]
               }
@@ -1222,7 +1240,207 @@
           "response": []
         },
         {
-          "name": "Crear en funciones",
+          "name": "Listar las funciones de una sucursal y un formato",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/funciones?sucursalId=5&formato=3D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones"
+              ],
+              "query": [
+                {
+                  "key": "sucursalId",
+                  "value": "5"
+                },
+                {
+                  "key": "formato",
+                  "value": "3D"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Todas son de la sucursal y del formato pedidos\", function () {",
+                  "  pm.response.json().forEach((funcion) => {",
+                  "    pm.expect(funcion.sucursalId).to.eql(5);",
+                  "    pm.expect(funcion.formato).to.eql(\"3D\");",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Listar las funciones de un dia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/funciones?fecha=2026-11-20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones"
+              ],
+              "query": [
+                {
+                  "key": "fecha",
+                  "value": "2026-11-20"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Todas son del día pedido\", function () {",
+                  "  pm.response.json().forEach((funcion) => pm.expect(funcion.fecha).to.eql(\"2026-11-20\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Listar las funciones que todavia no empezaron",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/funciones?proximas=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones"
+              ],
+              "query": [
+                {
+                  "key": "proximas",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Ninguna empezó\", function () {",
+                  "  pm.response.json().forEach((funcion) => pm.expect(new Date(funcion.iniciaEn).getTime()).to.be.above(Date.now() - 60000));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Ver una funcion por id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/funciones/6",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones",
+                "6"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Es la función pedida y tiene entradas vendidas\", function () {",
+                  "  const funcion = pm.response.json();",
+                  "  pm.expect(funcion.id).to.eql(6);",
+                  "  pm.expect(funcion.vendidas).to.be.above(0);",
+                  "  pm.expect(funcion.capacidad).to.eql(48);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Ver las butacas de una funcion",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/funciones/6/butacas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones",
+                "6",
+                "butacas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Trae las 48 butacas y marca las ocupadas y las accesibles\", function () {",
+                  "  const mapa = pm.response.json();",
+                  "  pm.expect(mapa.butacas).to.have.lengthOf(48);",
+                  "  pm.expect(mapa.butacas[0].codigo).to.eql(\"A1\");",
+                  "  pm.expect(mapa.butacas.filter((butaca) => butaca.ocupada)).to.have.lengthOf(mapa.vendidas);",
+                  "  pm.expect(mapa.butacas.filter((butaca) => butaca.accesible)).to.not.be.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Crear una funcion",
           "request": {
             "method": "POST",
             "header": [
@@ -1242,7 +1460,68 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{}",
+              "raw": "{\n  \"peliculaId\": 3,\n  \"salaId\": 10,\n  \"iniciaEn\": \"{{iniciaEn}}\",\n  \"formato\": \"3D\",\n  \"idioma\": \"Castellano\",\n  \"precio\": 9000.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const dias = 400 + Math.floor(Math.random() * 3000);",
+                  "const minutos = Math.floor(Math.random() * 1440);",
+                  "pm.collectionVariables.set(\"iniciaEn\", new Date(Date.now() + dias * 86400000 + minutos * 60000).toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Guarda el id y la deja disponible\", function () {",
+                  "  const funcion = pm.response.json();",
+                  "  pm.expect(funcion.estado).to.eql(\"disponible\");",
+                  "  pm.expect(funcion.vendidas).to.eql(0);",
+                  "  pm.collectionVariables.set(\"funcionId\", funcion.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con el mismo horario en la misma sala (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/funciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"peliculaId\": 3,\n  \"salaId\": 10,\n  \"iniciaEn\": \"{{iniciaEn}}\",\n  \"formato\": \"3D\",\n  \"idioma\": \"Castellano\",\n  \"precio\": 9000.5\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1256,8 +1535,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 201\", function () {",
-                  "  pm.response.to.have.status(201);",
+                  "pm.test(\"Responde 409\", function () {",
+                  "  pm.response.to.have.status(409);",
                   "});"
                 ]
               }
@@ -1266,7 +1545,7 @@
           "response": []
         },
         {
-          "name": "Actualizar en funciones",
+          "name": "Actualizar una funcion",
           "request": {
             "method": "PATCH",
             "header": [
@@ -1276,18 +1555,18 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/funciones/1",
+              "raw": "{{baseUrl}}/funciones/{{funcionId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "funciones",
-                "1"
+                "{{funcionId}}"
               ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{}",
+              "raw": "{\n  \"precio\": 7000\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1303,6 +1582,11 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Cambia solo lo enviado\", function () {",
+                  "  const funcion = pm.response.json();",
+                  "  pm.expect(funcion.precio).to.eql(7000);",
+                  "  pm.expect(funcion.formato).to.eql(\"3D\");",
                   "});"
                 ]
               }
@@ -1311,18 +1595,461 @@
           "response": []
         },
         {
-          "name": "Eliminar de funciones",
+          "name": "Cambiar una funcion de sala (sin entradas vendidas)",
           "request": {
-            "method": "DELETE",
-            "header": [],
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{baseUrl}}/funciones/1",
+              "raw": "{{baseUrl}}/funciones/{{funcionId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "funciones",
-                "1"
+                "{{funcionId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"salaId\": 9\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Queda en la otra sala\", function () {",
+                  "  pm.expect(pm.response.json().salaId).to.eql(9);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear sin zona horaria (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/funciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"peliculaId\": 3,\n  \"salaId\": 10,\n  \"iniciaEn\": \"2031-01-01T20:00:00\",\n  \"formato\": \"3D\",\n  \"precio\": 9000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con un formato inexistente (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/funciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"peliculaId\": 3,\n  \"salaId\": 10,\n  \"iniciaEn\": \"2031-01-01T20:00:00-03:00\",\n  \"formato\": \"4D\",\n  \"precio\": 9000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con un precio negativo (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/funciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"peliculaId\": 3,\n  \"salaId\": 10,\n  \"iniciaEn\": \"2031-01-01T20:00:00-03:00\",\n  \"formato\": \"3D\",\n  \"precio\": -1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con una pelicula inexistente (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/funciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"peliculaId\": 99999,\n  \"salaId\": 10,\n  \"iniciaEn\": \"2031-01-01T20:00:00-03:00\",\n  \"formato\": \"3D\",\n  \"precio\": 9000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con una sala inexistente (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/funciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"peliculaId\": 3,\n  \"salaId\": 99999,\n  \"iniciaEn\": \"2031-01-01T20:00:00-03:00\",\n  \"formato\": \"3D\",\n  \"precio\": 9000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: filtrar con una fecha inexistente (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/funciones?fecha=2026-02-30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones"
+              ],
+              "query": [
+                {
+                  "key": "fecha",
+                  "value": "2026-02-30"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: funcion inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/funciones/99999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones",
+                "99999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: butacas de una funcion inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/funciones/99999/butacas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones",
+                "99999",
+                "butacas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: cambiar de sala una funcion con entradas vendidas (409)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/funciones/6",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones",
+                "6"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"salaId\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: eliminar una funcion con entradas vendidas (409)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/funciones/6",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones",
+                "6"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Eliminar la funcion creada",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/funciones/{{funcionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones",
+                "{{funcionId}}"
               ]
             }
           },
@@ -1334,6 +2061,40 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () {",
                   "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Devuelve la función eliminada\", function () {",
+                  "  pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"funcionId\")));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: eliminar de nuevo (404)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/funciones/{{funcionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "funciones",
+                "{{funcionId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () {",
+                  "  pm.response.to.have.status(404);",
                   "});"
                 ]
               }
@@ -2581,7 +3342,7 @@
     },
     {
       "name": "catalogos",
-      "description": "Listas de solo lectura de géneros, clasificaciones y ciudades, para armar los formularios.",
+      "description": "Listas de solo lectura de géneros, clasificaciones, ciudades y salas, para armar los formularios.",
       "item": [
         {
           "name": "Listar generos",
@@ -2680,6 +3441,119 @@
                   "});",
                   "pm.test(\"Cada ciudad tiene provincia\", function () {",
                   "  pm.expect(pm.response.json()[0]).to.have.all.keys(\"id\", \"nombre\", \"provincia\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Listar salas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/catalogos/salas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "catalogos",
+                "salas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Cada sala trae su sucursal y su capacidad\", function () {",
+                  "  const salas = pm.response.json();",
+                  "  pm.expect(salas).to.be.an(\"array\").that.is.not.empty;",
+                  "  pm.expect(salas[0]).to.have.all.keys(\"id\", \"sucursalId\", \"sucursal\", \"nombre\", \"capacidad\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Listar las salas de una sucursal",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/catalogos/salas?sucursalId=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "catalogos",
+                "salas"
+              ],
+              "query": [
+                {
+                  "key": "sucursalId",
+                  "value": "2"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Todas son de la sucursal pedida\", function () {",
+                  "  pm.response.json().forEach((sala) => pm.expect(sala.sucursalId).to.eql(2));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: sucursalId inválido (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/catalogos/salas?sucursalId=abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "catalogos",
+                "salas"
+              ],
+              "query": [
+                {
+                  "key": "sucursalId",
+                  "value": "abc"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
                   "});"
                 ]
               }
