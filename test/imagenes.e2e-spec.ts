@@ -215,4 +215,82 @@ describe('Imágenes subidas (e2e)', () => {
     expect(pelicula.update).not.toHaveBeenCalled();
     expect(await archivosDe('peliculas')).toEqual([]);
   });
+
+  it('responde 400 si falta el archivo o se envía con otro nombre de campo', async () => {
+    pelicula.findUnique.mockResolvedValue(peliculaEnBase);
+
+    await subirPoster().expect(400);
+    await subirPoster().attach('foto', png, { filename: 'a.png' }).expect(400);
+    await subirPoster().field('archivo', 'texto').expect(400);
+
+    expect(pelicula.update).not.toHaveBeenCalled();
+  });
+
+  it('responde 413 si la imagen pesa más de 5 MB', async () => {
+    pelicula.findUnique.mockResolvedValue(peliculaEnBase);
+
+    await subirPoster()
+      .attach('archivo', Buffer.concat([png, Buffer.alloc(5 * 1024 * 1024)]), {
+        filename: 'grande.png',
+      })
+      .expect(413);
+
+    expect(pelicula.update).not.toHaveBeenCalled();
+    expect(await archivosDe('peliculas')).toEqual([]);
+  });
+
+  it('responde 404 si la película no existe y 400 si el id no es un número', async () => {
+    pelicula.findUnique.mockResolvedValue(null);
+
+    await subirPoster(99)
+      .attach('archivo', png, { filename: 'a.png' })
+      .expect(404);
+    await request(app.getHttpServer())
+      .post('/peliculas/abc/poster')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .attach('archivo', png, { filename: 'a.png' })
+      .expect(400);
+
+    expect(await archivosDe('peliculas')).toEqual([]);
+  });
+
+  it('si la base falla al guardar, borra la imagen que acababa de escribir', async () => {
+    pelicula.findUnique.mockResolvedValue(peliculaEnBase);
+    pelicula.update.mockRejectedValue({ code: 'P2025' });
+
+    await subirPoster()
+      .attach('archivo', png, { filename: 'a.png' })
+      .expect(404);
+
+    expect(await archivosDe('peliculas')).toEqual([]);
+  });
+
+  it('pide token de administrador antes de recibir el archivo', async () => {
+    await request(app.getHttpServer())
+      .post('/peliculas/1/poster')
+      .attach('archivo', png, { filename: 'a.png' })
+      .expect(401);
+    await subirPoster(1, tokenCliente)
+      .attach('archivo', png, { filename: 'a.png' })
+      .expect(403);
+
+    expect(pelicula.findUnique).not.toHaveBeenCalled();
+    expect(await archivosDe('peliculas')).toEqual([]);
+  });
+
+  it('DELETE /peliculas/:id borra también el póster subido', async () => {
+    await mkdir(join(carpeta, 'peliculas'), { recursive: true });
+    await writeFile(join(carpeta, 'peliculas', 'subido.png'), png);
+    pelicula.delete.mockResolvedValue({
+      ...peliculaEnBase,
+      posterArchivo: 'subido.png',
+    });
+
+    await request(app.getHttpServer())
+      .delete('/peliculas/1')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .expect(200);
+
+    expect(await archivosDe('peliculas')).toEqual([]);
+  });
 });
