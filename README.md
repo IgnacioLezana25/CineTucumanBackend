@@ -319,9 +319,9 @@ Los módulos de datos tienen las cinco rutas que genera Nest, con su nombre como
 | `sucursales` | `/sucursales` | Conectado con la base de datos mediante Prisma |
 | `productos` | `/productos` | Conectado con la base de datos mediante Prisma |
 | `catalogos` | `/catalogos` | Solo lectura, con Prisma (géneros, clasificaciones, ciudades y salas) |
-| `ordenes` | `/ordenes` | Estructura generada |
+| `ordenes` | `/ordenes` | Compras de entradas y Candy Bar, con el precio calculado por el servidor y permisos por rol |
 
-Las rutas de `peliculas`, `funciones`, `sucursales`, `productos` y `catalogos` ya leen y escriben en la base de datos. Las de los demás módulos todavía devuelven un texto de ejemplo: se conectan en las próximas etapas.
+Todos los módulos leen y escriben en la base de datos.
 
 ### Películas
 
@@ -502,7 +502,7 @@ Todas las rutas piden el token (401 si falta o no es válido).
 | `PATCH /users/:id` | El propio usuario o un administrador | Modifica `nombre`, `apellido`, `contrasena` o `rol`. Un cliente que cambia su contraseña debe enviar también `contrasenaActual`; el `rol` solo lo cambia un administrador | 200; 400 si un dato no es válido o falta `contrasenaActual`; 401 si `contrasenaActual` no coincide; 403; 404 |
 | `DELETE /users/:id` | Administrador | Elimina el usuario y devuelve lo que eliminó | 200; 403; 404; 409 si tiene órdenes |
 
-Por ahora los permisos de administrador se aplican solo a `/users`: las rutas de películas, funciones, sucursales y productos siguen abiertas, hasta que se conecte el panel de administración.
+Por ahora los permisos de administrador se aplican solo a `/users` y a las órdenes de otras personas: las rutas que crean, modifican o eliminan películas, funciones, sucursales y productos siguen abiertas, hasta que se conecte el panel de administración.
 
 ### Productos
 
@@ -529,6 +529,66 @@ Por ahora los permisos de administrador se aplican solo a `/users`: las rutas de
 
 `precio` se devuelve como número.
 
+### Órdenes
+
+Todas las rutas piden el token (401 si falta o no es válido). Una orden puede tener entradas, productos del Candy Bar o las dos cosas. Se crea ya **pagada**: todavía no hay pasarela de pago. No se puede modificar ni eliminar una orden; solo cancelarla.
+
+| Ruta | Quién | Qué hace | Respuestas |
+|---|---|---|---|
+| `POST /ordenes` | Cualquier usuario | Compra `entradas` (hasta 6, cada una con `funcionId` y `butacaId`) y `productos` (hasta 20, cada uno con `productoId` y `cantidad` de 1 a 10). Hace falta al menos una de las dos listas | 201; 400 si no hay nada para comprar, un dato no es válido, hay un elemento repetido, la función no existe o ya empezó, la butaca no existe o es de otra sala, o el producto no existe o está inactivo; 409 si alguna butaca ya fue vendida |
+| `GET /ordenes` | Cada usuario ve las suyas; el administrador ve todas | Lista las órdenes, de la más nueva a la más vieja. Filtros opcionales: `estado` (`pendiente`, `pagada` o `cancelada`) y `usuarioId` | 200; 400 si un filtro no es válido; 403 si un cliente filtra por otro usuario |
+| `GET /ordenes/:id` | Su dueño o un administrador | Una orden por su número | 200; 400; 403 si es de otra persona; 404 |
+| `PATCH /ordenes/:id/cancelar` | Su dueño o un administrador | Cancela la orden y libera sus butacas | 200; 400; 403; 404; 409 si ya estaba cancelada o alguna de sus funciones ya empezó |
+
+El cuerpo del `POST` es solo lo que se compra:
+
+```json
+{
+  "entradas": [
+    { "funcionId": 6, "butacaId": 398 },
+    { "funcionId": 6, "butacaId": 404 }
+  ],
+  "productos": [{ "productoId": 1, "cantidad": 2 }]
+}
+```
+
+El usuario sale del token y los precios, de la base: si el cuerpo trae `usuarioId`, `estado` o un precio, se ignora. La respuesta es la orden con su detalle:
+
+```json
+{
+  "id": 6,
+  "numero": "CT-7K3MQ9XD",
+  "usuarioId": 4,
+  "estado": "pagada",
+  "creadaEn": "2026-11-19T15:12:40.000Z",
+  "entradas": [
+    {
+      "id": 10,
+      "funcionId": 6,
+      "pelicula": "Spider-Man: Un nuevo día",
+      "sucursal": "Sunstar Cinemas",
+      "sala": "Sala 1",
+      "iniciaEn": "2026-11-20T22:20:00.000Z",
+      "fecha": "2026-11-20",
+      "horario": "19:20",
+      "butacaId": 398,
+      "butaca": "B3",
+      "precioUnitario": 8500
+    }
+  ],
+  "productos": [
+    { "productoId": 1, "nombre": "Combo Clásico", "cantidad": 2, "precioUnitario": 6000, "subtotal": 12000 }
+  ],
+  "total": 20500
+}
+```
+
+- **Número de orden:** `CT-` y ocho caracteres al azar, sin letras ni números que se confundan (`O`, `0`, `I`, `1`). Es el que se le muestra a la persona.
+- **Butacas:** cada butaca de una función se vende una sola vez; la base lo garantiza con una restricción única. Si dos personas compran la misma butaca al mismo tiempo, una recibe 201 y la otra 409.
+- **Todo o nada:** la orden, sus entradas y sus productos se guardan en una sola operación: si algo falla, no se guarda nada.
+- **Cancelación:** pasa la orden a `cancelada` y elimina sus entradas y productos, así que las butacas vuelven a quedar libres y el `total` es 0. No se puede cancelar una orden con una función que ya empezó.
+- `fecha` y `horario` son la hora de Tucumán (UTC-3) y `total` se calcula con los precios guardados en la orden, como la vista `v_ordenes`.
+
 ### Imágenes
 
 `posterUrl` se arma con `API_BASE_URL` y apunta a un archivo de `public/imagenes/peliculas/`, que la API sirve directamente. `posterArchivo` es el nombre que se guarda en la base y el que se envía al crear o editar una película. Las sucursales funcionan igual con `imagenArchivo` e `imagenUrl`, con los archivos de `public/imagenes/sucursales/`, y el reparto con `fotoArchivo` y `fotoUrl`, con los de `public/imagenes/reparto/`.
@@ -539,7 +599,7 @@ En [`docs/postman/`](docs/postman) están la colección y el entorno:
 
 1. En Postman, **Import** y elegir `CineTucuman.postman_collection.json` y `CineTucuman.postman_environment.json`.
 2. Elegir el entorno **Cine Tucumán · local** (define `baseUrl` como `http://localhost:4000`; hay que cambiarla si el puerto del `.env` es otro).
-3. Con el servidor andando y la base cargada con los datos de ejemplo, ejecutar la colección: tiene una carpeta por módulo con sus peticiones, y cada una comprueba el código de respuesta. Las carpetas `auth` y `users` guardan solas el token que devuelve el login (variables `tokenCliente` y `tokenAdmin` de la colección) y lo usan en las peticiones siguientes. Las carpetas `peliculas`, `funciones`, `sucursales` y `productos` incluyen además los filtros, la búsqueda por `slug` y los casos de error (400, 404 y 409). Cada carpeta se ejecuta completa y en orden: crea un registro de prueba, lo modifica y lo elimina, así que la base queda como estaba.
+3. Con el servidor andando y la base cargada con los datos de ejemplo, ejecutar la colección: tiene una carpeta por módulo con sus peticiones, y cada una comprueba el código de respuesta. Las carpetas `auth` y `users` guardan solas el token que devuelve el login (variables `tokenCliente` y `tokenAdmin` de la colección) y lo usan en las peticiones siguientes. Las carpetas `peliculas`, `funciones`, `sucursales` y `productos` incluyen además los filtros, la búsqueda por `slug` y los casos de error (400, 404 y 409). Cada carpeta se ejecuta completa y en orden: crea un registro de prueba, lo modifica y lo elimina, así que la base queda como estaba. La carpeta `ordenes` crea su propia función lejana en el tiempo (así no depende de las fechas de los datos de ejemplo), compra, consulta y cancela, y elimina la función; como una orden no se puede eliminar, cada corrida deja una orden `cancelada` en la base.
 
 ## Estrategia de ramas
 
@@ -556,7 +616,7 @@ Cada rama sale de `dev`. Los cambios entran por un pull request con base `dev`, 
 
 ## Próximas etapas
 
-- Conectar con Prisma el módulo que falta: órdenes (con el precio calculado por el servidor y las butacas de cada entrada). Conviene mantener fija la versión 7.10.1 de `prisma`: la etiqueta `latest` del paquete apunta hoy a un candidato de la versión 8.
+- Conviene mantener fija la versión 7.10.1 de `prisma`: la etiqueta `latest` del paquete apunta hoy a un candidato de la versión 8.
 - Proteger con el rol de administrador las rutas que crean, modifican o eliminan películas, funciones, sucursales y productos.
 - Subida de pósters nuevos desde el panel de administración.
 - Conectar el frontend a esta API en lugar de sus datos locales.
