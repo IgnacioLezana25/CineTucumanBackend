@@ -1,0 +1,206 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Usuario {
+  id             Int      @id @default(autoincrement())
+  nombre         String   @db.VarChar(60)
+  apellido       String   @db.VarChar(60)
+  correo         String   @unique(map: "usuarios_correo_key") @db.VarChar(120)
+  contrasenaHash String   @map("contrasena_hash") @db.VarChar(100)
+  rol            String   @default("cliente") @db.VarChar(10)
+  creadoEn       DateTime @default(now()) @map("creado_en") @db.Timestamptz(6)
+  ordenes        Orden[]
+
+  @@map("usuarios")
+}
+
+model Genero {
+  id        Int              @id @default(autoincrement())
+  nombre    String           @unique(map: "generos_nombre_key") @db.VarChar(40)
+  peliculas PeliculaGenero[]
+
+  @@map("generos")
+}
+
+model Clasificacion {
+  id        Int        @id @default(autoincrement())
+  nombre    String     @unique(map: "clasificaciones_nombre_key") @db.VarChar(40)
+  peliculas Pelicula[]
+
+  @@map("clasificaciones")
+}
+
+model Pelicula {
+  id              Int              @id @default(autoincrement())
+  slug            String           @unique(map: "peliculas_slug_key") @db.VarChar(80)
+  titulo          String           @db.VarChar(150)
+  tituloOriginal  String?          @map("titulo_original") @db.VarChar(150)
+  sinopsis        String?
+  duracionMinutos Int?             @map("duracion_minutos") @db.SmallInt
+  clasificacionId Int?             @map("clasificacion_id")
+  estado          String           @db.VarChar(15)
+  destacada       Boolean          @default(false)
+  fechaEstreno    DateTime?        @map("fecha_estreno") @db.Date
+  posterArchivo   String           @map("poster_archivo") @db.VarChar(120)
+  trailerYoutube  String?          @map("trailer_youtube") @db.VarChar(20)
+  director        String?          @db.VarChar(100)
+  paisOrigen      String?          @map("pais_origen") @db.VarChar(60)
+  clasificacion   Clasificacion?   @relation(fields: [clasificacionId], references: [id], onDelete: Restrict, map: "peliculas_clasificacion_fkey")
+  generos         PeliculaGenero[]
+  funciones       Funcion[]
+
+  @@index([clasificacionId], map: "peliculas_clasificacion_idx")
+  @@map("peliculas")
+}
+
+model PeliculaGenero {
+  peliculaId Int      @map("pelicula_id")
+  generoId   Int      @map("genero_id")
+  pelicula   Pelicula @relation(fields: [peliculaId], references: [id], onDelete: Cascade, map: "peliculas_generos_pelicula_fkey")
+  genero     Genero   @relation(fields: [generoId], references: [id], onDelete: Restrict, map: "peliculas_generos_genero_fkey")
+
+  @@id([peliculaId, generoId])
+  @@index([generoId], map: "peliculas_generos_genero_idx")
+  @@map("peliculas_generos")
+}
+
+model Ciudad {
+  id         Int        @id @default(autoincrement())
+  nombre     String     @db.VarChar(60)
+  provincia  String     @default("Tucumán") @db.VarChar(60)
+  sucursales Sucursal[]
+
+  @@unique([nombre, provincia], map: "ciudades_nombre_provincia_key")
+  @@map("ciudades")
+}
+
+model Sucursal {
+  id            Int              @id @default(autoincrement())
+  slug          String           @unique(map: "sucursales_slug_key") @db.VarChar(60)
+  nombre        String           @db.VarChar(80)
+  ciudadId      Int              @map("ciudad_id")
+  direccion     String           @db.VarChar(100)
+  descripcion   String?
+  imagenArchivo String?          @map("imagen_archivo") @db.VarChar(120)
+  destacada     Boolean          @default(false)
+  ciudad        Ciudad           @relation(fields: [ciudadId], references: [id], onDelete: Restrict, map: "sucursales_ciudad_fkey")
+  enlaces       SucursalEnlace[]
+  salas         Sala[]
+
+  @@index([ciudadId], map: "sucursales_ciudad_idx")
+  @@map("sucursales")
+}
+
+model SucursalEnlace {
+  sucursalId Int      @map("sucursal_id")
+  tipo       String   @db.VarChar(10)
+  url        String   @db.VarChar(200)
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade, map: "sucursal_enlaces_sucursal_fkey")
+
+  @@id([sucursalId, tipo])
+  @@map("sucursal_enlaces")
+}
+
+model Sala {
+  id         Int       @id @default(autoincrement())
+  sucursalId Int       @map("sucursal_id")
+  nombre     String    @db.VarChar(30)
+  sucursal   Sucursal  @relation(fields: [sucursalId], references: [id], onDelete: Cascade, map: "salas_sucursal_fkey")
+  butacas    Butaca[]
+  funciones  Funcion[]
+
+  @@unique([sucursalId, nombre], map: "salas_sucursal_nombre_key")
+  @@map("salas")
+}
+
+model Butaca {
+  id        Int       @id @default(autoincrement())
+  salaId    Int       @map("sala_id")
+  fila      String    @db.Char(1)
+  numero    Int       @db.SmallInt
+  accesible Boolean   @default(false)
+  sala      Sala      @relation(fields: [salaId], references: [id], onDelete: Cascade, map: "butacas_sala_fkey")
+  entradas  Entrada[]
+
+  @@unique([salaId, fila, numero], map: "butacas_sala_fila_numero_key")
+  @@map("butacas")
+}
+
+model Funcion {
+  id         Int       @id @default(autoincrement())
+  peliculaId Int       @map("pelicula_id")
+  salaId     Int       @map("sala_id")
+  iniciaEn   DateTime  @map("inicia_en") @db.Timestamptz(6)
+  formato    String    @db.VarChar(2)
+  idioma     String    @default("Castellano") @db.VarChar(30)
+  precio     Decimal   @db.Decimal(10, 2)
+  pelicula   Pelicula  @relation(fields: [peliculaId], references: [id], onDelete: Restrict, map: "funciones_pelicula_fkey")
+  sala       Sala      @relation(fields: [salaId], references: [id], onDelete: Restrict, map: "funciones_sala_fkey")
+  entradas   Entrada[]
+
+  @@unique([salaId, iniciaEn], map: "funciones_sala_inicio_key")
+  @@index([peliculaId, iniciaEn], map: "funciones_pelicula_idx")
+  @@map("funciones")
+}
+
+model Producto {
+  id          Int             @id @default(autoincrement())
+  slug        String          @unique(map: "productos_slug_key") @db.VarChar(60)
+  nombre      String          @db.VarChar(80)
+  descripcion String?         @db.VarChar(200)
+  categoria   String          @db.VarChar(10)
+  precio      Decimal         @db.Decimal(10, 2)
+  activo      Boolean         @default(true)
+  ordenes     OrdenProducto[]
+
+  @@map("productos")
+}
+
+model Orden {
+  id        Int             @id @default(autoincrement())
+  numero    String          @unique(map: "ordenes_numero_key") @db.VarChar(20)
+  usuarioId Int             @map("usuario_id")
+  estado    String          @default("pendiente") @db.VarChar(10)
+  creadaEn  DateTime        @default(now()) @map("creada_en") @db.Timestamptz(6)
+  usuario   Usuario         @relation(fields: [usuarioId], references: [id], onDelete: Restrict, map: "ordenes_usuario_fkey")
+  entradas  Entrada[]
+  productos OrdenProducto[]
+
+  @@index([usuarioId], map: "ordenes_usuario_idx")
+  @@map("ordenes")
+}
+
+model Entrada {
+  id             Int     @id @default(autoincrement())
+  ordenId        Int     @map("orden_id")
+  funcionId      Int     @map("funcion_id")
+  butacaId       Int     @map("butaca_id")
+  precioUnitario Decimal @map("precio_unitario") @db.Decimal(10, 2)
+  orden          Orden   @relation(fields: [ordenId], references: [id], onDelete: Cascade, map: "entradas_orden_fkey")
+  funcion        Funcion @relation(fields: [funcionId], references: [id], onDelete: Restrict, map: "entradas_funcion_fkey")
+  butaca         Butaca  @relation(fields: [butacaId], references: [id], onDelete: Restrict, map: "entradas_butaca_fkey")
+
+  @@unique([funcionId, butacaId], map: "entradas_funcion_butaca_key")
+  @@index([ordenId], map: "entradas_orden_idx")
+  @@index([butacaId], map: "entradas_butaca_idx")
+  @@map("entradas")
+}
+
+model OrdenProducto {
+  ordenId        Int      @map("orden_id")
+  productoId     Int      @map("producto_id")
+  cantidad       Int      @db.SmallInt
+  precioUnitario Decimal  @map("precio_unitario") @db.Decimal(10, 2)
+  orden          Orden    @relation(fields: [ordenId], references: [id], onDelete: Cascade, map: "orden_productos_orden_fkey")
+  producto       Producto @relation(fields: [productoId], references: [id], onDelete: Restrict, map: "orden_productos_producto_fkey")
+
+  @@id([ordenId, productoId])
+  @@index([productoId], map: "orden_productos_producto_idx")
+  @@map("orden_productos")
+}
