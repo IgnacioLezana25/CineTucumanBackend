@@ -9,6 +9,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { SoloAdministrador } from '../auth/decorators/solo-administrador.decorator.js';
 import { ProductosService } from './productos.service.js';
 import { CreateProductoDto } from './dto/create-producto.dto.js';
 import { FiltrarProductosDto } from './dto/filtrar-productos.dto.js';
@@ -19,6 +20,7 @@ export class ProductosController {
   constructor(private readonly productosService: ProductosService) {}
 
   @Post()
+  @SoloAdministrador()
   create(@Body() createProductoDto: CreateProductoDto) {
     return this.productosService.create(createProductoDto);
   }
@@ -39,6 +41,7 @@ export class ProductosController {
   }
 
   @Patch(':id')
+  @SoloAdministrador()
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateProductoDto: UpdateProductoDto,
@@ -47,6 +50,7 @@ export class ProductosController {
   }
 
   @Delete(':id')
+  @SoloAdministrador()
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.productosService.remove(id);
   }

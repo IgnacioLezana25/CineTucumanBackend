@@ -9,6 +9,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { SoloAdministrador } from '../auth/decorators/solo-administrador.decorator.js';
 import { PeliculasService } from './peliculas.service.js';
 import { CreatePeliculaDto } from './dto/create-pelicula.dto.js';
 import { FiltrarPeliculasDto } from './dto/filtrar-peliculas.dto.js';
@@ -19,6 +20,7 @@ export class PeliculasController {
   constructor(private readonly peliculasService: PeliculasService) {}
 
   @Post()
+  @SoloAdministrador()
   create(@Body() createPeliculaDto: CreatePeliculaDto) {
     return this.peliculasService.create(createPeliculaDto);
   }
@@ -39,6 +41,7 @@ export class PeliculasController {
   }
 
   @Patch(':id')
+  @SoloAdministrador()
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updatePeliculaDto: UpdatePeliculaDto,
@@ -47,6 +50,7 @@ export class PeliculasController {
   }
 
   @Delete(':id')
+  @SoloAdministrador()
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.peliculasService.remove(id);
   }
