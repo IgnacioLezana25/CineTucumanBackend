@@ -1,14 +1,17 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  Controller,
   Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
 } from '@nestjs/common';
 import { FuncionesService } from './funciones.service.js';
 import { CreateFuncionDto } from './dto/create-funcion.dto.js';
+import { FiltrarFuncionesDto } from './dto/filtrar-funciones.dto.js';
 import { UpdateFuncionDto } from './dto/update-funcion.dto.js';
 
 @Controller('funciones')
@@ -21,22 +24,30 @@ export class FuncionesController {
   }
 
   @Get()
-  findAll() {
-    return this.funcionesService.findAll();
+  findAll(@Query() filtros: FiltrarFuncionesDto) {
+    return this.funcionesService.findAll(filtros);
+  }
+
+  @Get(':id/butacas')
+  findButacas(@Param('id', ParseIntPipe) id: number) {
+    return this.funcionesService.findButacas(id);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.funcionesService.findOne(+id);
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.funcionesService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateFuncionDto: UpdateFuncionDto) {
-    return this.funcionesService.update(+id, updateFuncionDto);
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateFuncionDto: UpdateFuncionDto,
+  ) {
+    return this.funcionesService.update(id, updateFuncionDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.funcionesService.remove(+id);
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.funcionesService.remove(id);
   }
 }
