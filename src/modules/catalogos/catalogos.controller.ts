@@ -1,5 +1,6 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { CatalogosService } from './catalogos.service.js';
+import { FiltrarSalasDto } from './dto/filtrar-salas.dto.js';
 
 @Controller('catalogos')
 export class CatalogosController {
@@ -18,5 +19,10 @@ export class CatalogosController {
   @Get('ciudades')
   ciudades() {
     return this.catalogosService.ciudades();
+  }
+
+  @Get('salas')
+  salas(@Query() filtros: FiltrarSalasDto) {
+    return this.catalogosService.salas(filtros);
   }
 }
