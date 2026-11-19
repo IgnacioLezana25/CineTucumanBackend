@@ -4,24 +4,13 @@ import {
   ArrayNotEmpty,
   ArrayUnique,
   IsArray,
-  IsIn,
-  IsInt,
   IsOptional,
-  IsPositive,
   ValidateNested,
 } from 'class-validator';
 import { EntradaOrdenDto } from './entrada-orden.dto.js';
 import { ProductoOrdenDto } from './producto-orden.dto.js';
 
 export class CreateOrdenDto {
-  @IsInt()
-  @IsPositive()
-  usuarioId: number;
-
-  @IsOptional()
-  @IsIn(['pendiente', 'pagada', 'cancelada'])
-  estado?: string;
-
   @IsOptional()
   @IsArray()
   @ArrayNotEmpty()
@@ -36,6 +25,7 @@ export class CreateOrdenDto {
   @IsOptional()
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayMaxSize(20)
   @ArrayUnique((producto: ProductoOrdenDto) => producto.productoId)
   @ValidateNested({ each: true })
   @Type(() => ProductoOrdenDto)
