@@ -62,6 +62,8 @@ FRONTEND_URL=http://localhost:5173
 | `API_BASE_URL` | La dirección base de la API: se muestra al arrancar y se usa para armar la dirección completa de los pósters |
 | `FRONTEND_URL` | Desde dónde se permite llamar a la API (CORS). Si falta, usa `http://localhost:5173`. Admite varias direcciones separadas por coma |
 
+Si la contraseña de PostgreSQL tiene símbolos, en `DATABASE_URL` hay que escribirlos codificados: `#` es `%23`, `/` es `%2F`, `?` es `%3F`, `@` es `%40`, `:` es `%3A`, `%` es `%25` y el espacio es `%20`. Si la dirección no se puede interpretar, la API no arranca y lo avisa con el mensaje «DATABASE_URL no es una URL válida».
+
 El archivo lo lee `ConfigModule` de `@nestjs/config`, que se registra una sola vez en `AppModule` y queda disponible en todo el proyecto. Prisma lo lee por su cuenta desde `prisma.config.ts`.
 
 ## Validación de los datos
@@ -259,12 +261,14 @@ database/            Scripts SQL (crear la base, esquema, datos, verificación y
 docs/postman/        Colección y entorno de Postman
 prisma/              Esquema de Prisma y migraciones
 prisma.config.ts     Configuración de la herramienta de Prisma
-public/imagenes/     Archivos que la API sirve por URL (los pósters de las películas)
+public/imagenes/     Archivos que la API sirve por URL (pósters de películas y fotos de sucursales)
 src/
   main.ts            Punto de entrada: crea la aplicación, activa la validación y el CORS, sirve las imágenes y la pone a escuchar
   modules/           Todos los módulos del proyecto
     app/             Módulo raíz: reúne a los demás
     prisma/          Conexión con la base de datos (global)
+    catalogos/       Géneros, clasificaciones y ciudades (solo lectura)
+    comunes/         Utilidades compartidas, como armar la URL pública de una imagen
     auth/            Registro e inicio de sesión
     users/           Usuarios
     peliculas/       Películas
@@ -286,11 +290,12 @@ Cada módulo tiene las cinco rutas que genera Nest, con su nombre como prefijo: 
 | `users` | `/users` | Estructura generada |
 | `peliculas` | `/peliculas` | Conectado con la base de datos mediante Prisma |
 | `funciones` | `/funciones` | Estructura generada |
-| `sucursales` | `/sucursales` | Estructura generada |
-| `productos` | `/productos` | Estructura generada |
+| `sucursales` | `/sucursales` | Conectado con la base de datos mediante Prisma |
+| `productos` | `/productos` | Conectado con la base de datos mediante Prisma |
+| `catalogos` | `/catalogos` | Solo lectura, con Prisma |
 | `ordenes` | `/ordenes` | Estructura generada |
 
-Las rutas de `peliculas` ya leen y escriben en la base de datos. Las de los demás módulos todavía devuelven un texto de ejemplo: se conectan en las próximas etapas.
+Las rutas de `peliculas`, `sucursales`, `productos` y `catalogos` ya leen y escriben en la base de datos. Las de los demás módulos todavía devuelven un texto de ejemplo: se conectan en las próximas etapas.
 
 ### Películas
 
@@ -328,7 +333,74 @@ Cada película se devuelve así:
 }
 ```
 
-`posterUrl` se arma con `API_BASE_URL` y apunta a un archivo de `public/imagenes/peliculas/`, que la API sirve directamente. `posterArchivo` es el nombre que se guarda en la base y el que se envía al crear o editar una película.
+### Catálogos
+
+Listas de solo lectura para armar los formularios (por ejemplo, los géneros y la clasificación de una película, o la ciudad de una sucursal):
+
+| Ruta | Devuelve |
+|---|---|
+| `GET /catalogos/generos` | `[{ "id": 1, "nombre": "Acción" }]`, ordenados por nombre |
+| `GET /catalogos/clasificaciones` | `[{ "id": 1, "nombre": "ATP" }]` |
+| `GET /catalogos/ciudades` | `[{ "id": 2, "nombre": "Yerba Buena", "provincia": "Tucumán" }]`, ordenadas por nombre |
+
+### Sucursales
+
+| Ruta | Qué hace | Respuestas |
+|---|---|---|
+| `GET /sucursales` | Lista las sucursales. Filtro opcional: `destacada` (`true` o `false`) | 200; 400 si el filtro no es válido |
+| `GET /sucursales/:id` | Una sucursal por su número | 200; 400 si `:id` no es un número; 404 |
+| `GET /sucursales/slug/:slug` | Una sucursal por su `slug` | 200; 404 |
+| `POST /sucursales` | Crea una sucursal con `CreateSucursalDto`, con sus enlaces | 201; 400 si un dato no es válido (por ejemplo, un enlace sin `https://`) o la ciudad no existe; 409 si el `slug` ya existe |
+| `PATCH /sucursales/:id` | Modifica los campos que se envían. Si se envía `enlaces`, reemplaza todos los enlaces; con `[]` los quita | 200; 400; 404; 409 |
+| `DELETE /sucursales/:id` | Elimina la sucursal con sus salas y sus enlaces, y devuelve lo que eliminó | 200; 404; 409 si alguna de sus salas tiene funciones |
+
+```json
+{
+  "id": 4,
+  "slug": "sunstar-cinemas",
+  "nombre": "Sunstar Cinemas",
+  "ciudadId": 2,
+  "ciudad": "Yerba Buena",
+  "provincia": "Tucumán",
+  "direccion": "Avenida Fermín Cariola 42",
+  "descripcion": "Complejo Sunstar Cinemas ubicado en Yerba Buena.",
+  "imagenArchivo": "sunstar-cinemas.jpg",
+  "imagenUrl": "http://localhost:4000/imagenes/sucursales/sunstar-cinemas.jpg",
+  "destacada": true,
+  "enlaces": [{ "tipo": "sitio", "url": "https://www.cinesunstar.com/" }]
+}
+```
+
+`direccion` es solo la calle y el número: la ciudad y la provincia vienen aparte. Los `enlaces` se devuelven ordenados por `tipo`.
+
+### Productos
+
+| Ruta | Qué hace | Respuestas |
+|---|---|---|
+| `GET /productos` | Lista los productos del Candy Bar. Filtros opcionales: `categoria` (`combo`, `snack` o `bebida`) y `activo` (`true` o `false`) | 200; 400 si un filtro no es válido |
+| `GET /productos/:id` | Un producto por su número | 200; 400; 404 |
+| `GET /productos/slug/:slug` | Un producto por su `slug` | 200; 404 |
+| `POST /productos` | Crea un producto con `CreateProductoDto` | 201; 400 si un dato no es válido (precio negativo o con más de dos decimales, categoría inexistente, `activo` que no es `true` o `false`); 409 si el `slug` ya existe |
+| `PATCH /productos/:id` | Modifica los campos que se envían | 200; 400; 404; 409 |
+| `DELETE /productos/:id` | Elimina el producto y devuelve lo que eliminó | 200; 404; 409 si figura en órdenes (en ese caso se desactiva con `"activo": false`) |
+
+```json
+{
+  "id": 1,
+  "slug": "combo-clasico",
+  "nombre": "Combo Clásico",
+  "descripcion": "Pochoclos grande + gaseosa mediana",
+  "categoria": "combo",
+  "precio": 6000,
+  "activo": true
+}
+```
+
+`precio` se devuelve como número.
+
+### Imágenes
+
+`posterUrl` se arma con `API_BASE_URL` y apunta a un archivo de `public/imagenes/peliculas/`, que la API sirve directamente. `posterArchivo` es el nombre que se guarda en la base y el que se envía al crear o editar una película. Las sucursales funcionan igual con `imagenArchivo` e `imagenUrl`, con los archivos de `public/imagenes/sucursales/`.
 
 ## Pruebas de la API con Postman
 
@@ -336,7 +408,7 @@ En [`docs/postman/`](docs/postman) están la colección y el entorno:
 
 1. En Postman, **Import** y elegir `CineTucuman.postman_collection.json` y `CineTucuman.postman_environment.json`.
 2. Elegir el entorno **Cine Tucumán · local** (define `baseUrl` como `http://localhost:4000`; hay que cambiarla si el puerto del `.env` es otro).
-3. Con el servidor andando, ejecutar la colección: tiene una carpeta por módulo con sus peticiones, y cada una comprueba el código de respuesta. La carpeta `peliculas` incluye además los filtros, la búsqueda por `slug` y los casos de error (400, 404 y 409).
+3. Con el servidor andando, ejecutar la colección: tiene una carpeta por módulo con sus peticiones, y cada una comprueba el código de respuesta. Las carpetas `peliculas`, `sucursales` y `productos` incluyen además los filtros, la búsqueda por `slug` y los casos de error (400, 404 y 409). Cada carpeta se ejecuta completa y en orden: crea un registro de prueba, lo modifica y lo elimina, así que la base queda como estaba.
 
 ## Estrategia de ramas
 
@@ -353,7 +425,7 @@ Cada rama sale de `dev`. Los cambios entran por un pull request con base `dev`, 
 
 ## Próximas etapas
 
-- Conectar con Prisma los módulos que faltan: sucursales, productos, funciones (con las butacas ocupadas de cada una) y órdenes. Conviene mantener fija la versión 7.10.1 de `prisma`: la etiqueta `latest` del paquete apunta hoy a un candidato de la versión 8.
+- Conectar con Prisma los módulos que faltan: funciones (con las butacas ocupadas de cada una) y órdenes. Conviene mantener fija la versión 7.10.1 de `prisma`: la etiqueta `latest` del paquete apunta hoy a un candidato de la versión 8.
 - Registro e inicio de sesión con usuarios reales (`auth` y `users`).
 - Subida de pósters nuevos desde el panel de administración.
 - Conectar el frontend a esta API en lugar de sus datos locales.
