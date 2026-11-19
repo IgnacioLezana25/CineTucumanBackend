@@ -12,6 +12,7 @@ const sucursalEnBase = {
   ciudadId: 2,
   direccion: 'Avenida Fermín Cariola 42',
   descripcion: null,
+  referencia: 'Portal de Tucumán Shopping.',
   imagenArchivo: 'sunstar-cinemas.jpg',
   destacada: true,
   ciudad: { id: 2, nombre: 'Yerba Buena', provincia: 'Tucumán' },
@@ -67,6 +68,7 @@ describe('Sucursales (e2e)', () => {
       slug: 'sunstar-cinemas',
       ciudad: 'Yerba Buena',
       provincia: 'Tucumán',
+      referencia: 'Portal de Tucumán Shopping.',
       imagenUrl:
         'http://localhost:4000/imagenes/sucursales/sunstar-cinemas.jpg',
       enlaces: [{ tipo: 'sitio', url: 'https://www.cinesunstar.com/' }],
@@ -116,11 +118,14 @@ describe('Sucursales (e2e)', () => {
       .post('/sucursales')
       .send({
         ...cuerpoValido,
+        referencia: 'Portal de Tucumán Shopping.',
         enlaces: [{ tipo: 'sitio', url: 'https://www.cinesunstar.com/' }],
       })
       .expect(201);
 
     const datos = sucursal.create.mock.calls[0][0].data;
+
+    expect(datos.referencia).toBe('Portal de Tucumán Shopping.');
 
     expect(datos.enlaces).toEqual({
       create: [{ tipo: 'sitio', url: 'https://www.cinesunstar.com/' }],

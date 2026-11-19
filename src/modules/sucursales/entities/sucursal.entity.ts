@@ -12,6 +12,7 @@ export class Sucursal {
   provincia: string;
   direccion: string;
   descripcion: string | null;
+  referencia: string | null;
   imagenArchivo: string | null;
   imagenUrl: string | null;
   destacada: boolean;

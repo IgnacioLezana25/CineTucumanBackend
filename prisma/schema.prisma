@@ -53,6 +53,7 @@ model Pelicula {
   paisOrigen      String?          @map("pais_origen") @db.VarChar(60)
   clasificacion   Clasificacion?   @relation(fields: [clasificacionId], references: [id], onDelete: Restrict, map: "peliculas_clasificacion_fkey")
   generos         PeliculaGenero[]
+  reparto         PeliculaReparto[]
   funciones       Funcion[]
 
   @@index([clasificacionId], map: "peliculas_clasificacion_idx")
@@ -68,6 +69,18 @@ model PeliculaGenero {
   @@id([peliculaId, generoId])
   @@index([generoId], map: "peliculas_generos_genero_idx")
   @@map("peliculas_generos")
+}
+
+model PeliculaReparto {
+  peliculaId  Int      @map("pelicula_id")
+  orden       Int      @db.SmallInt
+  nombre      String   @db.VarChar(80)
+  fotoArchivo String?  @map("foto_archivo") @db.VarChar(120)
+  pelicula    Pelicula @relation(fields: [peliculaId], references: [id], onDelete: Cascade, map: "pelicula_reparto_pelicula_fkey")
+
+  @@id([peliculaId, orden])
+  @@unique([peliculaId, nombre], map: "pelicula_reparto_nombre_key")
+  @@map("pelicula_reparto")
 }
 
 model Ciudad {
@@ -87,6 +100,7 @@ model Sucursal {
   ciudadId      Int              @map("ciudad_id")
   direccion     String           @db.VarChar(100)
   descripcion   String?
+  referencia    String?          @db.VarChar(120)
   imagenArchivo String?          @map("imagen_archivo") @db.VarChar(120)
   destacada     Boolean          @default(false)
   ciudad        Ciudad           @relation(fields: [ciudadId], references: [id], onDelete: Restrict, map: "sucursales_ciudad_fkey")

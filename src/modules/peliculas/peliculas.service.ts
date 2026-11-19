@@ -17,11 +17,12 @@ import {
 import { CreatePeliculaDto } from './dto/create-pelicula.dto.js';
 import { FiltrarPeliculasDto } from './dto/filtrar-peliculas.dto.js';
 import { UpdatePeliculaDto } from './dto/update-pelicula.dto.js';
-import { Pelicula } from './entities/pelicula.entity.js';
+import { ActorPelicula, Pelicula } from './entities/pelicula.entity.js';
 
 const INCLUIR_RELACIONES = {
   clasificacion: true,
   generos: { include: { genero: true }, orderBy: { generoId: 'asc' } },
+  reparto: { orderBy: { orden: 'asc' } },
 } satisfies Prisma.PeliculaInclude;
 
 type PeliculaConRelaciones = Prisma.PeliculaGetPayload<{
@@ -40,7 +41,7 @@ export class PeliculasService {
   }
 
   async create(createPeliculaDto: CreatePeliculaDto): Promise<Pelicula> {
-    const { generoIds, fechaEstreno, ...datos } = createPeliculaDto;
+    const { generoIds, reparto, fechaEstreno, ...datos } = createPeliculaDto;
 
     try {
       const pelicula = await this.prisma.pelicula.create({
@@ -57,6 +58,7 @@ export class PeliculasService {
           generos: {
             create: (generoIds ?? []).map((generoId) => ({ generoId })),
           },
+          reparto: { create: this.armarReparto(reparto ?? []) },
         },
         include: INCLUIR_RELACIONES,
       });
@@ -116,7 +118,7 @@ export class PeliculasService {
     id: number,
     updatePeliculaDto: UpdatePeliculaDto,
   ): Promise<Pelicula> {
-    const { generoIds, fechaEstreno, ...datos } = updatePeliculaDto;
+    const { generoIds, reparto, fechaEstreno, ...datos } = updatePeliculaDto;
 
     try {
       const pelicula = await this.prisma.pelicula.update({
@@ -134,6 +136,9 @@ export class PeliculasService {
                 deleteMany: {},
                 create: generoIds.map((generoId) => ({ generoId })),
               }
+            : undefined,
+          reparto: reparto
+            ? { deleteMany: {}, create: this.armarReparto(reparto) }
             : undefined,
         },
         include: INCLUIR_RELACIONES,
@@ -172,6 +177,14 @@ export class PeliculasService {
 
       throw error;
     }
+  }
+
+  private armarReparto(reparto: CreatePeliculaDto['reparto'] = []) {
+    return reparto.map((actor, indice) => ({
+      orden: indice + 1,
+      nombre: actor.nombre,
+      fotoArchivo: actor.fotoArchivo ?? null,
+    }));
   }
 
   private convertirFecha(fecha: string | null | undefined) {
@@ -218,6 +231,19 @@ export class PeliculasService {
       paisOrigen: pelicula.paisOrigen,
       generoIds: pelicula.generos.map((relacion) => relacion.generoId),
       generos: pelicula.generos.map((relacion) => relacion.genero.nombre),
+      reparto: pelicula.reparto.map((actor) => this.presentarActor(actor)),
+    };
+  }
+
+  private presentarActor(
+    actor: PeliculaConRelaciones['reparto'][number],
+  ): ActorPelicula {
+    return {
+      nombre: actor.nombre,
+      fotoArchivo: actor.fotoArchivo,
+      fotoUrl: actor.fotoArchivo
+        ? urlDeImagen(this.urlBase, 'reparto', actor.fotoArchivo)
+        : null,
     };
   }
 }

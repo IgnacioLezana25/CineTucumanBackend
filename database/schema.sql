@@ -1,6 +1,6 @@
 -- Cine Tucumán · Esquema de la base de datos (PostgreSQL), normalizado hasta la 3FN
 --
--- Crea las 15 tablas con sus tipos, claves primarias, claves foráneas y restricciones, y dos
+-- Crea las 16 tablas con sus tipos, claves primarias, claves foráneas y restricciones, y dos
 -- vistas para lo que se calcula (el total de una orden y la disponibilidad de una función).
 -- La explicación de la normalización está en database/normalizacion.md.
 --
@@ -16,7 +16,7 @@ SET client_encoding = 'UTF8';
 BEGIN;
 
 DROP TABLE IF EXISTS orden_productos, entradas, ordenes, productos, funciones, butacas, salas,
-  sucursal_enlaces, sucursales, ciudades, peliculas_generos, peliculas, clasificaciones, generos,
+  sucursal_enlaces, sucursales, ciudades, pelicula_reparto, peliculas_generos, peliculas, clasificaciones, generos,
   usuarios CASCADE;
 
 -- ---------------------------------------------------------------------------
@@ -82,6 +82,20 @@ CREATE TABLE peliculas_generos (
     REFERENCES generos (id) ON DELETE RESTRICT
 );
 
+-- Reparto de una película: los actores en el orden en que se muestran. Cada lugar del orden se
+-- ocupa una sola vez y un actor no se repite dentro de la misma película.
+CREATE TABLE pelicula_reparto (
+  pelicula_id  INTEGER      NOT NULL,
+  orden        SMALLINT     NOT NULL,
+  nombre       VARCHAR(80)  NOT NULL,
+  foto_archivo VARCHAR(120),
+  PRIMARY KEY (pelicula_id, orden),
+  CONSTRAINT pelicula_reparto_pelicula_fkey FOREIGN KEY (pelicula_id)
+    REFERENCES peliculas (id) ON DELETE CASCADE,
+  CONSTRAINT pelicula_reparto_orden_check CHECK (orden > 0),
+  CONSTRAINT pelicula_reparto_nombre_key UNIQUE (pelicula_id, nombre)
+);
+
 -- ---------------------------------------------------------------------------
 -- Ciudades, sucursales y sus enlaces
 -- ---------------------------------------------------------------------------
@@ -93,6 +107,7 @@ CREATE TABLE ciudades (
 );
 
 -- La dirección es solo la calle y el número: la ciudad y la provincia salen de ciudades.
+-- La referencia indica dónde queda el cine (por ejemplo, dentro de qué shopping); es opcional.
 CREATE TABLE sucursales (
   id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   slug           VARCHAR(60)  NOT NULL,
@@ -100,6 +115,7 @@ CREATE TABLE sucursales (
   ciudad_id      INTEGER      NOT NULL,
   direccion      VARCHAR(100) NOT NULL,
   descripcion    TEXT,
+  referencia     VARCHAR(120),
   imagen_archivo VARCHAR(120),
   destacada      BOOLEAN      NOT NULL DEFAULT FALSE,
   CONSTRAINT sucursales_slug_key UNIQUE (slug),
@@ -277,6 +293,7 @@ COMMENT ON TABLE generos           IS 'Géneros cinematográficos';
 COMMENT ON TABLE clasificaciones   IS 'Clasificaciones por edad de las películas';
 COMMENT ON TABLE peliculas         IS 'Cartelera y próximos estrenos';
 COMMENT ON TABLE peliculas_generos IS 'Relación muchos a muchos entre películas y géneros';
+COMMENT ON TABLE pelicula_reparto  IS 'Actores de cada película, en el orden en que se muestran, con el archivo de su foto';
 COMMENT ON TABLE ciudades          IS 'Ciudades donde hay sucursales';
 COMMENT ON TABLE sucursales        IS 'Cines de Tucumán';
 COMMENT ON TABLE sucursal_enlaces  IS 'Enlaces de cada sucursal: sitio, Instagram o Facebook';

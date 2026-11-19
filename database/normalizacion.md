@@ -7,7 +7,7 @@ Este documento explica por qué el esquema de [`schema.sql`](schema.sql) cumple 
 | Forma normal | Qué pide | Cómo se cumple en este esquema |
 |---|---|---|
 | **1FN** | Cada columna guarda **un solo valor** (atómico) y no hay columnas repetidas | La butaca se guarda como fila y número por separado, y los enlaces de una sucursal están en su propia tabla en lugar de una columna por red social |
-| **2FN** | Cumple la 1FN y **cada columna depende de toda la clave primaria**, no de una parte | Las tres tablas con clave compuesta (`peliculas_generos`, `sucursal_enlaces` y `orden_productos`) no tienen columnas que dependan de una sola parte de su clave. Las demás tienen clave simple, así que la cumplen sin más |
+| **2FN** | Cumple la 1FN y **cada columna depende de toda la clave primaria**, no de una parte | Las cuatro tablas con clave compuesta (`peliculas_generos`, `pelicula_reparto`, `sucursal_enlaces` y `orden_productos`) no tienen columnas que dependan de una sola parte de su clave. Las demás tienen clave simple, así que la cumplen sin más |
 | **3FN** | Cumple la 2FN y **ninguna columna depende de otra columna que no sea la clave** (no hay dependencias transitivas) | La ciudad y la provincia no están en `sucursales`, la clasificación no está en `peliculas`, y lo que se calcula (el total de una orden y la disponibilidad de una función) no se guarda |
 
 ## Tabla por tabla
@@ -19,8 +19,9 @@ Este documento explica por qué el esquema de [`schema.sql`](schema.sql) cumple 
 | `clasificaciones` | `id` (y `nombre`, única) | De la clasificación: su nombre | Una sola columna además de la clave |
 | `peliculas` | `id` (y `slug`, única) | De la película: título, sinopsis, duración, estreno, póster, tráiler, director, país y estado | El nombre de la clasificación **no está acá**: solo su `clasificacion_id` |
 | `peliculas_generos` | (`pelicula_id`, `genero_id`) | No tiene más columnas | Tabla de relación muchos a muchos |
+| `pelicula_reparto` | (`pelicula_id`, `orden`) | Del lugar que ocupa un actor en el reparto de esa película: su nombre y el archivo de su foto | Depende de **toda** la clave. Además, un actor no se repite dentro de una película (`pelicula_id` + `nombre`, única) |
 | `ciudades` | `id` (y `nombre` + `provincia`) | De la ciudad: su provincia | La provincia depende de la ciudad, que es la clave de esta tabla |
-| `sucursales` | `id` (y `slug`, única) | De la sucursal: nombre, calle y número, descripción, imagen | La ciudad y la provincia **no están acá**: solo su `ciudad_id` |
+| `sucursales` | `id` (y `slug`, única) | De la sucursal: nombre, calle y número, descripción, referencia, imagen | La ciudad y la provincia **no están acá**: solo su `ciudad_id` |
 | `sucursal_enlaces` | (`sucursal_id`, `tipo`) | De la sucursal y el tipo: la dirección web | Depende de **toda** la clave (el enlace de Instagram de esa sucursal) |
 | `salas` | `id` (y `sucursal_id` + `nombre`) | De la sala: su nombre y a qué sucursal pertenece | La cantidad de butacas se obtiene contando en `butacas` |
 | `butacas` | `id` (y `sala_id` + `fila` + `numero`) | De la butaca: si es accesible | La fila y el número son valores atómicos, no un código como «B3» |
@@ -37,6 +38,7 @@ El primer esquema tenía cinco problemas, que se corrigieron:
 | Problema | Forma normal que rompía | Cómo se resolvió |
 |---|---|---|
 | `sucursales` tenía `ciudad` y también una `direccion` que ya incluía la ciudad: la ciudad se podía deducir de la dirección | **3FN** (dependencia transitiva) | Tabla `ciudades`. La dirección es solo la calle y el número, y la sucursal apunta a su ciudad con `ciudad_id` |
+| El reparto de una película era una lista de actores dentro de un solo dato | **1FN** (grupo repetido) | Tabla `pelicula_reparto`, con una fila por actor y su lugar en el orden |
 | Los enlaces eran columnas fijas (`sitio_web` e `instagram`), y una sucursal tiene además Facebook | **1FN** (grupo repetido) | Tabla `sucursal_enlaces`, con una fila por enlace y su tipo |
 | La butaca de una entrada era un código como «B3», que junta dos datos, y no existían las butacas accesibles | **1FN** (valor no atómico) | Tabla `butacas`, con fila, número y si es accesible. La entrada apunta a la butaca con `butaca_id` |
 | La orden guardaba su `total` y la función su `estado`, que se calculan de otras filas | Redundancia: dos fuentes de verdad que se pueden desincronizar | Se sacaron de las tablas y se calculan en las vistas `v_ordenes` y `v_funciones` |

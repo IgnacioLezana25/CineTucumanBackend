@@ -16,6 +16,7 @@ FROM (
   UNION ALL SELECT 'clasificaciones', COUNT(*) FROM clasificaciones
   UNION ALL SELECT 'peliculas', COUNT(*) FROM peliculas
   UNION ALL SELECT 'peliculas_generos', COUNT(*) FROM peliculas_generos
+  UNION ALL SELECT 'pelicula_reparto', COUNT(*) FROM pelicula_reparto
   UNION ALL SELECT 'ciudades', COUNT(*) FROM ciudades
   UNION ALL SELECT 'sucursales', COUNT(*) FROM sucursales
   UNION ALL SELECT 'sucursal_enlaces', COUNT(*) FROM sucursal_enlaces
@@ -53,8 +54,8 @@ GROUP BY p.id, c.nombre
 ORDER BY p.id;
 
 \echo
-\echo '== 4. Sucursales con su ciudad y sus enlaces'
-SELECT su.nombre, su.direccion, ci.nombre AS ciudad, ci.provincia,
+\echo '== 4. Sucursales con su ciudad, su referencia y sus enlaces'
+SELECT su.nombre, su.direccion, su.referencia, ci.nombre AS ciudad, ci.provincia,
        string_agg(e.tipo, ', ' ORDER BY e.tipo) AS enlaces
 FROM sucursales su
 JOIN ciudades ci ON ci.id = su.ciudad_id

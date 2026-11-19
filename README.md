@@ -89,7 +89,7 @@ En Windows, si la terminal no reconoce `psql`, se puede usar la aplicación **SQ
 | Paso | Comando | Qué hace |
 |---|---|---|
 | 1 | `psql -U postgres -f database/00-crear-base.sql` | Crea la base `cine_tucuman` (una sola vez) |
-| 2 | `psql -U postgres -d cine_tucuman -f database/schema.sql` | Crea las 15 tablas y las 2 vistas |
+| 2 | `psql -U postgres -d cine_tucuman -f database/schema.sql` | Crea las 16 tablas y las 2 vistas |
 | 3 | `psql -U postgres -d cine_tucuman -f database/seed.sql` | Carga los datos de ejemplo |
 | 4 | `psql -U postgres -d cine_tucuman -f database/verificacion.sql` | Comprueba que cada tabla tenga al menos 5 registros y que los datos sean coherentes |
 | 5 | `psql -U postgres -d cine_tucuman -f database/pruebas-de-integridad.sql` | Intenta cargar datos inválidos a propósito y comprueba que la base los rechaza |
@@ -113,6 +113,7 @@ erDiagram
     ciudades ||--o{ sucursales : "ubica"
     sucursales ||--o{ sucursal_enlaces : "publica"
     clasificaciones |o--o{ peliculas : "clasifica"
+    peliculas ||--o{ pelicula_reparto : "presenta"
     peliculas ||--o{ peliculas_generos : " "
     generos ||--o{ peliculas_generos : " "
 
@@ -170,6 +171,7 @@ erDiagram
         string slug UK
         int ciudad_id FK
         string direccion
+        string referencia
     }
     ciudades {
         int id PK
@@ -192,6 +194,12 @@ erDiagram
         int id PK
         string nombre UK
     }
+    pelicula_reparto {
+        int pelicula_id PK, FK
+        int orden PK
+        string nombre
+        string foto_archivo
+    }
     peliculas_generos {
         int pelicula_id PK, FK
         int genero_id PK, FK
@@ -207,7 +215,7 @@ erDiagram
 La base está normalizada hasta la **tercera forma normal (3FN)**. [`database/normalizacion.md`](database/normalizacion.md) lo explica tabla por tabla. En resumen:
 
 - **1FN:** todas las columnas guardan un solo valor. La butaca se guarda como fila y número por separado, y los enlaces de una sucursal tienen su propia tabla en lugar de una columna por red social.
-- **2FN:** las tablas con clave compuesta (`peliculas_generos`, `sucursal_enlaces` y `orden_productos`) no tienen columnas que dependan de una sola parte de su clave.
+- **2FN:** las tablas con clave compuesta (`peliculas_generos`, `pelicula_reparto`, `sucursal_enlaces` y `orden_productos`) no tienen columnas que dependan de una sola parte de su clave.
 - **3FN:** ninguna columna depende de otra que no sea la clave. La ciudad y la provincia están en `ciudades`, la clasificación en `clasificaciones` y los géneros en `generos`, y lo que se calcula no se guarda: el total de una orden y la disponibilidad de una función salen de las vistas `v_ordenes` y `v_funciones`.
 
 ### Tablas
@@ -219,6 +227,7 @@ La base está normalizada hasta la **tercera forma normal (3FN)**. [`database/no
 | `clasificaciones` | Clasificaciones por edad | 5 |
 | `peliculas` | Cartelera y próximos estrenos | 20 |
 | `peliculas_generos` | Relación muchos a muchos entre películas y géneros | 6 |
+| `pelicula_reparto` | Actores de cada película, en el orden en que se muestran, con su foto | 6 |
 | `ciudades` | Ciudades donde hay sucursales | 5 |
 | `sucursales` | Los cines de Tucumán | 5 |
 | `sucursal_enlaces` | Sitio, Instagram o Facebook de cada sucursal | 9 |
@@ -230,7 +239,7 @@ La base está normalizada hasta la **tercera forma normal (3FN)**. [`database/no
 | `entradas` | Una butaca de una función dentro de una orden; no se vende dos veces | 9 |
 | `orden_productos` | Productos del Candy Bar de cada orden, con su cantidad | 7 |
 
-Las películas, las sucursales con sus enlaces y el Candy Bar salen del frontend. Lo que el sitio todavía no tiene (por ejemplo, la duración de la mayoría de las películas) queda vacío, igual que el sitio muestra «Por confirmar». Los usuarios, las salas, las funciones y las órdenes son de ejemplo. La contraseña de todos los usuarios de ejemplo es `Prueba123!` y se guarda cifrada con bcrypt.
+Las películas (con el reparto de Spider-Man), las sucursales con sus enlaces y su referencia, y el Candy Bar salen del frontend. Lo que el sitio todavía no tiene (por ejemplo, la duración de la mayoría de las películas) queda vacío, igual que el sitio muestra «Por confirmar». Los usuarios, las salas, las funciones y las órdenes son de ejemplo. La contraseña de todos los usuarios de ejemplo es `Prueba123!` y se guarda cifrada con bcrypt.
 
 ## Conexión con Prisma
 
@@ -238,9 +247,10 @@ Prisma es la capa que usan los services para leer y escribir en PostgreSQL. La A
 
 | Archivo | Qué hace |
 |---|---|
-| `prisma/schema.prisma` | Describe las 15 tablas como modelos de Prisma. Los nombres de los modelos van en singular (`Pelicula`) y `@@map` y `@map` los enlazan con las tablas y columnas reales (`peliculas`, `poster_archivo`) |
+| `prisma/schema.prisma` | Describe las 16 tablas como modelos de Prisma. Los nombres de los modelos van en singular (`Pelicula`) y `@@map` y `@map` los enlazan con las tablas y columnas reales (`peliculas`, `poster_archivo`) |
 | `prisma.config.ts` | Le dice a la herramienta de Prisma dónde está el esquema y de dónde sacar `DATABASE_URL` |
 | `prisma/migrations/0_init/` | Migración inicial: es el SQL de `database/schema.sql` sin el borrado de tablas |
+| `prisma/migrations/1_…` y `2_…` | Cambios posteriores a `0_init`: la referencia de las sucursales y el reparto de las películas. Sirven para actualizar una base que ya existe |
 | `src/modules/prisma/` | `PrismaService` (se conecta al arrancar y se desconecta al cerrar) y `PrismaModule`, que es global: cualquier service puede recibir `PrismaService` sin importar el módulo |
 | `src/generated/prisma/` | El cliente que genera Prisma. No se sube a GitHub: se crea con `npm install` o con `npx prisma generate` |
 
@@ -252,6 +262,15 @@ Si se quiere que Prisma registre esa migración como ya aplicada (opcional: la A
 npx prisma migrate resolve --applied 0_init
 ```
 
+**Si la base ya existía** (se creó antes de que se agregaran la referencia de las sucursales y el reparto de las películas), no hace falta borrarla: alcanza con ejecutar, en orden, las dos migraciones. Son SQL común, no borran nada y se pueden correr más de una vez:
+
+```
+psql -U postgres -d cine_tucuman -f prisma/migrations/1_referencia_en_sucursales/migration.sql
+psql -U postgres -d cine_tucuman -f prisma/migrations/2_reparto_de_peliculas/migration.sql
+```
+
+Una base nueva, creada con `schema.sql` y `seed.sql`, ya los trae.
+
 Si se cambia `prisma/schema.prisma`, hay que volver a ejecutar `npx prisma generate`. Para comprobar que el esquema no tiene errores: `npx prisma validate`.
 
 ## Estructura del proyecto
@@ -261,7 +280,7 @@ database/            Scripts SQL (crear la base, esquema, datos, verificación y
 docs/postman/        Colección y entorno de Postman
 prisma/              Esquema de Prisma y migraciones
 prisma.config.ts     Configuración de la herramienta de Prisma
-public/imagenes/     Archivos que la API sirve por URL (pósters de películas y fotos de sucursales)
+public/imagenes/     Archivos que la API sirve por URL (pósters de películas, fotos del reparto y fotos de sucursales)
 src/
   main.ts            Punto de entrada: crea la aplicación, activa la validación y el CORS, sirve las imágenes y la pone a escuchar
   modules/           Todos los módulos del proyecto
@@ -304,8 +323,8 @@ Las rutas de `peliculas`, `funciones`, `sucursales`, `productos` y `catalogos` y
 | `GET /peliculas` | Lista las películas. Filtros opcionales: `estado` (`en-cartelera` o `proximamente`), `destacada` (`true` o `false`) y `q` (texto dentro del título) | 200; 400 si un filtro no es válido |
 | `GET /peliculas/:id` | Una película por su número | 200; 400 si `:id` no es un número; 404 si no existe |
 | `GET /peliculas/slug/:slug` | Una película por su `slug`, como el que usa el sitio en la dirección (`/peliculas/toy-story-5`) | 200; 404 si no existe |
-| `POST /peliculas` | Crea una película con `CreatePeliculaDto` | 201; 400 si falta un dato, un dato no es válido o la clasificación o un género no existen; 409 si el `slug` ya existe |
-| `PATCH /peliculas/:id` | Modifica solo los campos que se envían. Si se envía `generoIds`, reemplaza todos los géneros; con `[]` los quita. Con `null` se vacían los campos opcionales | 200; 400; 404; 409 |
+| `POST /peliculas` | Crea una película con `CreatePeliculaDto`, con su reparto opcional (hasta 30 actores, sin nombres repetidos) | 201; 400 si falta un dato, un dato no es válido o la clasificación o un género no existen; 409 si el `slug` ya existe |
+| `PATCH /peliculas/:id` | Modifica solo los campos que se envían. Si se envía `generoIds`, reemplaza todos los géneros; con `[]` los quita. Con `reparto` pasa lo mismo con los actores. Con `null` se vacían los campos opcionales | 200; 400; 404; 409 |
 | `DELETE /peliculas/:id` | Elimina la película y devuelve lo que eliminó | 200; 404; 409 si tiene funciones |
 
 Cada película se devuelve así:
@@ -329,9 +348,19 @@ Cada película se devuelve así:
   "director": "Destin Daniel Cretton",
   "paisOrigen": "Estados Unidos",
   "generoIds": [1, 2, 3],
-  "generos": ["Acción", "Aventuras", "Ciencia ficción"]
+  "generos": ["Acción", "Aventuras", "Ciencia ficción"],
+  "reparto": [
+    {
+      "nombre": "Tom Holland",
+      "fotoArchivo": "tom-holland.jpg",
+      "fotoUrl": "http://localhost:4000/imagenes/reparto/tom-holland.jpg"
+    },
+    { "nombre": "Zendaya", "fotoArchivo": "zendaya.jpg", "fotoUrl": "http://localhost:4000/imagenes/reparto/zendaya.jpg" }
+  ]
 }
 ```
+
+`reparto` se devuelve en el orden en que se cargó. Al crear o modificar una película se envía como `[{ "nombre": "Tom Holland", "fotoArchivo": "tom-holland.jpg" }]`; `fotoArchivo` es opcional y, si falta, `fotoUrl` es `null`.
 
 ### Catálogos
 
@@ -417,6 +446,7 @@ Listas de solo lectura para armar los formularios (por ejemplo, los géneros y l
   "provincia": "Tucumán",
   "direccion": "Avenida Fermín Cariola 42",
   "descripcion": "Complejo Sunstar Cinemas ubicado en Yerba Buena.",
+  "referencia": "Portal de Tucumán Shopping.",
   "imagenArchivo": "sunstar-cinemas.jpg",
   "imagenUrl": "http://localhost:4000/imagenes/sucursales/sunstar-cinemas.jpg",
   "destacada": true,
@@ -424,7 +454,7 @@ Listas de solo lectura para armar los formularios (por ejemplo, los géneros y l
 }
 ```
 
-`direccion` es solo la calle y el número: la ciudad y la provincia vienen aparte. Los `enlaces` se devuelven ordenados por `tipo`.
+`direccion` es solo la calle y el número: la ciudad y la provincia vienen aparte. `referencia` indica dónde queda el cine (por ejemplo, dentro de qué shopping) y es `null` si no se cargó. Los `enlaces` se devuelven ordenados por `tipo`.
 
 ### Productos
 
@@ -453,7 +483,7 @@ Listas de solo lectura para armar los formularios (por ejemplo, los géneros y l
 
 ### Imágenes
 
-`posterUrl` se arma con `API_BASE_URL` y apunta a un archivo de `public/imagenes/peliculas/`, que la API sirve directamente. `posterArchivo` es el nombre que se guarda en la base y el que se envía al crear o editar una película. Las sucursales funcionan igual con `imagenArchivo` e `imagenUrl`, con los archivos de `public/imagenes/sucursales/`.
+`posterUrl` se arma con `API_BASE_URL` y apunta a un archivo de `public/imagenes/peliculas/`, que la API sirve directamente. `posterArchivo` es el nombre que se guarda en la base y el que se envía al crear o editar una película. Las sucursales funcionan igual con `imagenArchivo` e `imagenUrl`, con los archivos de `public/imagenes/sucursales/`, y el reparto con `fotoArchivo` y `fotoUrl`, con los de `public/imagenes/reparto/`.
 
 ## Pruebas de la API con Postman
 
