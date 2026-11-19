@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/modules/app/app.module.js';
@@ -24,6 +25,7 @@ const cuerpoValido = {
 
 describe('Productos (e2e)', () => {
   let app: INestApplication<App>;
+  let tokenAdmin: string;
   const producto = {
     create: vi.fn(),
     findMany: vi.fn(),
@@ -45,6 +47,12 @@ describe('Productos (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe());
     await app.init();
+
+    tokenAdmin = await app.get(JwtService).signAsync({
+      sub: 5,
+      correo: 'admin@test.com',
+      rol: 'admin',
+    });
   });
 
   afterEach(async () => {
@@ -86,6 +94,7 @@ describe('Productos (e2e)', () => {
 
     const respuesta = await request(app.getHttpServer())
       .post('/productos')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send(cuerpoValido)
       .expect(201);
 
@@ -105,6 +114,7 @@ describe('Productos (e2e)', () => {
     for (const cuerpo of invalidos) {
       await request(app.getHttpServer())
         .post('/productos')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .send(cuerpo)
         .expect(400);
     }
@@ -117,6 +127,7 @@ describe('Productos (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/productos')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send(cuerpoValido)
       .expect(409);
   });
@@ -126,6 +137,7 @@ describe('Productos (e2e)', () => {
 
     await request(app.getHttpServer())
       .patch('/productos/1')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ nombre: null, activo: false })
       .expect(200);
 
@@ -140,6 +152,7 @@ describe('Productos (e2e)', () => {
 
     await request(app.getHttpServer())
       .patch('/productos/99')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ activo: false })
       .expect(404);
   });
@@ -148,7 +161,13 @@ describe('Productos (e2e)', () => {
     producto.delete.mockRejectedValueOnce({ code: 'P2003' });
     producto.delete.mockResolvedValueOnce(productoEnBase);
 
-    await request(app.getHttpServer()).delete('/productos/1').expect(409);
-    await request(app.getHttpServer()).delete('/productos/1').expect(200);
+    await request(app.getHttpServer())
+      .delete('/productos/1')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .expect(409);
+    await request(app.getHttpServer())
+      .delete('/productos/1')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .expect(200);
   });
 });

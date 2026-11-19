@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/modules/app/app.module.js';
@@ -44,6 +45,7 @@ const cuerpoValido = {
 
 describe('Peliculas (e2e)', () => {
   let app: INestApplication<App>;
+  let tokenAdmin: string;
   const pelicula = {
     create: vi.fn(),
     findMany: vi.fn(),
@@ -65,6 +67,12 @@ describe('Peliculas (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe());
     await app.init();
+
+    tokenAdmin = await app.get(JwtService).signAsync({
+      sub: 5,
+      correo: 'admin@test.com',
+      rol: 'admin',
+    });
   });
 
   afterEach(async () => {
@@ -132,6 +140,7 @@ describe('Peliculas (e2e)', () => {
   it('POST /peliculas sin título responde 400 y no toca la base', async () => {
     await request(app.getHttpServer())
       .post('/peliculas')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ ...cuerpoValido, titulo: undefined })
       .expect(400);
 
@@ -143,6 +152,7 @@ describe('Peliculas (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/peliculas')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ ...cuerpoValido, fechaEstreno: '2026-07-30', generoIds: [4] })
       .expect(201);
 
@@ -158,6 +168,7 @@ describe('Peliculas (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/peliculas')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({
         ...cuerpoValido,
         reparto: [
@@ -180,6 +191,7 @@ describe('Peliculas (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/peliculas')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send(cuerpoValido)
       .expect(201);
 
@@ -199,6 +211,7 @@ describe('Peliculas (e2e)', () => {
     for (const reparto of repartosInvalidos) {
       await request(app.getHttpServer())
         .post('/peliculas')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .send({ ...cuerpoValido, reparto })
         .expect(400);
     }
@@ -211,6 +224,7 @@ describe('Peliculas (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/peliculas')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send(cuerpoValido)
       .expect(409);
   });
@@ -220,6 +234,7 @@ describe('Peliculas (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/peliculas')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ ...cuerpoValido, clasificacionId: 999 })
       .expect(400);
   });
@@ -229,6 +244,7 @@ describe('Peliculas (e2e)', () => {
 
     await request(app.getHttpServer())
       .patch('/peliculas/99')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ titulo: 'Nuevo' })
       .expect(404);
   });
@@ -238,6 +254,7 @@ describe('Peliculas (e2e)', () => {
 
     await request(app.getHttpServer())
       .patch('/peliculas/1')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ titulo: null, sinopsis: null })
       .expect(200);
 
@@ -252,14 +269,17 @@ describe('Peliculas (e2e)', () => {
 
     await request(app.getHttpServer())
       .patch('/peliculas/1')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ reparto: [{ nombre: 'Tim Allen' }] })
       .expect(200);
     await request(app.getHttpServer())
       .patch('/peliculas/1')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ reparto: [] })
       .expect(200);
     await request(app.getHttpServer())
       .patch('/peliculas/1')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ titulo: 'Nuevo' })
       .expect(200);
 
@@ -277,7 +297,10 @@ describe('Peliculas (e2e)', () => {
   it('DELETE /peliculas/:id con funciones responde 409', async () => {
     pelicula.delete.mockRejectedValue({ code: 'P2003' });
 
-    await request(app.getHttpServer()).delete('/peliculas/1').expect(409);
+    await request(app.getHttpServer())
+      .delete('/peliculas/1')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .expect(409);
   });
 
   it('DELETE /peliculas/:id devuelve la película eliminada', async () => {
@@ -285,6 +308,7 @@ describe('Peliculas (e2e)', () => {
 
     const respuesta = await request(app.getHttpServer())
       .delete('/peliculas/1')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .expect(200);
 
     expect(respuesta.body.slug).toBe('toy-story-5');

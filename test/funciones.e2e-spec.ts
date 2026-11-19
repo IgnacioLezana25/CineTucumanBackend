@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/modules/app/app.module.js';
@@ -33,6 +34,7 @@ const cuerpoValido = {
 
 describe('Funciones (e2e)', () => {
   let app: INestApplication<App>;
+  let tokenAdmin: string;
   const funcion = {
     create: vi.fn(),
     findMany: vi.fn(),
@@ -54,6 +56,12 @@ describe('Funciones (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe());
     await app.init();
+
+    tokenAdmin = await app.get(JwtService).signAsync({
+      sub: 5,
+      correo: 'admin@test.com',
+      rol: 'admin',
+    });
   });
 
   afterEach(async () => {
@@ -241,6 +249,7 @@ describe('Funciones (e2e)', () => {
 
     const respuesta = await request(app.getHttpServer())
       .post('/funciones')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send(cuerpoValido)
       .expect(201);
 
@@ -253,18 +262,22 @@ describe('Funciones (e2e)', () => {
   it('POST /funciones con datos inválidos responde 400', async () => {
     await request(app.getHttpServer())
       .post('/funciones')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ ...cuerpoValido, iniciaEn: '2026-11-20T19:20:00' })
       .expect(400);
     await request(app.getHttpServer())
       .post('/funciones')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ ...cuerpoValido, formato: '4D' })
       .expect(400);
     await request(app.getHttpServer())
       .post('/funciones')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ ...cuerpoValido, precio: -1 })
       .expect(400);
     await request(app.getHttpServer())
       .post('/funciones')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ salaId: 9 })
       .expect(400);
     expect(funcion.create).not.toHaveBeenCalled();
@@ -276,10 +289,12 @@ describe('Funciones (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/funciones')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send(cuerpoValido)
       .expect(409);
     await request(app.getHttpServer())
       .post('/funciones')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send(cuerpoValido)
       .expect(400);
   });
@@ -289,6 +304,7 @@ describe('Funciones (e2e)', () => {
 
     const respuesta = await request(app.getHttpServer())
       .patch('/funciones/6')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ precio: 9000 })
       .expect(200);
 
@@ -303,10 +319,12 @@ describe('Funciones (e2e)', () => {
 
     await request(app.getHttpServer())
       .patch('/funciones/99')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ precio: 1 })
       .expect(404);
     await request(app.getHttpServer())
       .patch('/funciones/6')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ iniciaEn: '2026-11-20T19:20:00-03:00' })
       .expect(409);
   });
@@ -319,6 +337,7 @@ describe('Funciones (e2e)', () => {
 
     await request(app.getHttpServer())
       .patch('/funciones/6')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ salaId: 10 })
       .expect(409);
     expect(funcion.update).not.toHaveBeenCalled();
@@ -334,10 +353,12 @@ describe('Funciones (e2e)', () => {
 
     await request(app.getHttpServer())
       .patch('/funciones/6')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ salaId: 10 })
       .expect(200);
     await request(app.getHttpServer())
       .patch('/funciones/99')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .send({ salaId: 10 })
       .expect(404);
   });
@@ -349,10 +370,17 @@ describe('Funciones (e2e)', () => {
 
     const eliminada = await request(app.getHttpServer())
       .delete('/funciones/6')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
       .expect(200);
 
     expect(eliminada.body.id).toBe(6);
-    await request(app.getHttpServer()).delete('/funciones/99').expect(404);
-    await request(app.getHttpServer()).delete('/funciones/6').expect(409);
+    await request(app.getHttpServer())
+      .delete('/funciones/99')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .expect(404);
+    await request(app.getHttpServer())
+      .delete('/funciones/6')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .expect(409);
   });
 });
