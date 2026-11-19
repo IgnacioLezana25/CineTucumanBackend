@@ -293,4 +293,54 @@ describe('Imágenes subidas (e2e)', () => {
 
     expect(await archivosDe('peliculas')).toEqual([]);
   });
+
+  it('POST /sucursales/:id/imagen guarda la imagen en su carpeta y borra la anterior subida', async () => {
+    await mkdir(join(carpeta, 'sucursales'), { recursive: true });
+    await writeFile(join(carpeta, 'sucursales', 'anterior.png'), png);
+    sucursal.findUnique.mockResolvedValue({
+      ...sucursalEnBase,
+      imagenArchivo: 'anterior.png',
+    });
+    sucursal.update.mockImplementation(({ data }) =>
+      Promise.resolve({ ...sucursalEnBase, imagenArchivo: data.imagenArchivo }),
+    );
+
+    const respuesta = await request(app.getHttpServer())
+      .post('/sucursales/4/imagen')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .attach('archivo', webp, { filename: 'fachada.webp' })
+      .expect(200);
+
+    expect(respuesta.body.imagenArchivo).toMatch(
+      /^sunstar-cinemas-[0-9a-f]{12}\.webp$/,
+    );
+    expect(respuesta.body.imagenUrl).toContain('/imagenes/sucursales/');
+    expect(await archivosDe('sucursales')).toEqual([
+      respuesta.body.imagenArchivo,
+    ]);
+  });
+
+  it('POST /sucursales/:id/imagen responde 404, 400, 401 y 403 según el caso', async () => {
+    sucursal.findUnique.mockResolvedValueOnce(null);
+    sucursal.findUnique.mockResolvedValueOnce(sucursalEnBase);
+
+    await request(app.getHttpServer())
+      .post('/sucursales/99/imagen')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .attach('archivo', png, { filename: 'a.png' })
+      .expect(404);
+    await request(app.getHttpServer())
+      .post('/sucursales/4/imagen')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .attach('archivo', Buffer.from('texto'), { filename: 'a.png' })
+      .expect(400);
+    await request(app.getHttpServer()).post('/sucursales/4/imagen').expect(401);
+    await request(app.getHttpServer())
+      .post('/sucursales/4/imagen')
+      .set('Authorization', `Bearer ${tokenCliente}`)
+      .expect(403);
+
+    expect(sucursal.update).not.toHaveBeenCalled();
+    expect(await archivosDe('sucursales')).toEqual([]);
+  });
 });
