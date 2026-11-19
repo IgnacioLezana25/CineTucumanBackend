@@ -18,6 +18,7 @@ API del proyecto Cine Tucumán, hecha con [NestJS](https://nestjs.com/). Reempla
 - `class-validator` y `class-transformer` para validar los datos que llegan en las peticiones.
 - Prisma 7.10.1 (`prisma`, `@prisma/client` y el adaptador `@prisma/adapter-pg`) para conectar la API con la base de datos.
 - `@nestjs/config` para las variables de entorno.
+- `@nestjs/jwt` para firmar y verificar los tokens de acceso y `bcrypt` para cifrar las contraseñas.
 - Vitest para las pruebas y oxlint para el análisis del código.
 - Postman para probar y documentar las rutas.
 
@@ -53,6 +54,8 @@ PORT=4000
 DATABASE_URL=postgresql://usuario:password@localhost:5432/cine_tucuman
 API_BASE_URL=http://localhost:4000/
 FRONTEND_URL=http://localhost:5173
+JWT_SECRET=una-frase-larga-y-secreta-de-al-menos-32-caracteres
+JWT_EXPIRES_IN=1h
 ```
 
 | Variable | Qué guarda |
@@ -61,6 +64,10 @@ FRONTEND_URL=http://localhost:5173
 | `DATABASE_URL` | La conexión a la base de datos PostgreSQL: usuario, contraseña, servidor, puerto y nombre |
 | `API_BASE_URL` | La dirección base de la API: se muestra al arrancar y se usa para armar la dirección completa de los pósters |
 | `FRONTEND_URL` | Desde dónde se permite llamar a la API (CORS). Si falta, usa `http://localhost:5173`. Admite varias direcciones separadas por coma |
+| `JWT_SECRET` | **Obligatoria.** El secreto con el que se firman los tokens de acceso, de **al menos 32 caracteres**. Si falta o es más corta, la API no arranca y lo avisa. Cada integrante usa la suya y nunca se sube a GitHub |
+| `JWT_EXPIRES_IN` | Cuánto dura un token: `1h`, `30m`, `7d` o una cantidad de segundos. Si falta, dura una hora |
+
+Una forma de generar un `JWT_SECRET` seguro: `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`.
 
 Si la contraseña de PostgreSQL tiene símbolos, en `DATABASE_URL` hay que escribirlos codificados: `#` es `%23`, `/` es `%2F`, `?` es `%3F`, `@` es `%40`, `:` es `%3A`, `%` es `%25` y el espacio es `%20`. Si la dirección no se puede interpretar, la API no arranca y lo avisa con el mensaje «DATABASE_URL no es una URL válida».
 
@@ -288,7 +295,7 @@ src/
     prisma/          Conexión con la base de datos (global)
     catalogos/       Géneros, clasificaciones y ciudades (solo lectura)
     comunes/         Utilidades compartidas, como armar la URL pública de una imagen o pasar un instante a la fecha y la hora de Tucumán
-    auth/            Registro e inicio de sesión
+    auth/            Registro, inicio de sesión, tokens JWT y guards de acceso
     users/           Usuarios
     peliculas/       Películas
     funciones/       Funciones
@@ -301,12 +308,12 @@ Cada módulo se creó con `npx nest g resource modules/<nombre>` y tiene su cont
 
 ## Módulos y rutas
 
-Cada módulo tiene las cinco rutas que genera Nest, con su nombre como prefijo: `GET /<módulo>`, `GET /<módulo>/:id`, `POST /<módulo>`, `PATCH /<módulo>/:id` y `DELETE /<módulo>/:id`. Además, `GET /` devuelve un saludo.
+Los módulos de datos tienen las cinco rutas que genera Nest, con su nombre como prefijo: `GET /<módulo>`, `GET /<módulo>/:id`, `POST /<módulo>`, `PATCH /<módulo>/:id` y `DELETE /<módulo>/:id`. Además, `GET /` devuelve un saludo.
 
 | Módulo | Prefijo | Estado |
 |---|---|---|
-| `auth` | `/auth` | Estructura generada |
-| `users` | `/users` | Estructura generada |
+| `auth` | `/auth` | Registro, inicio de sesión y perfil, con JWT y bcrypt |
+| `users` | `/users` | Conectado con la base de datos mediante Prisma, con permisos por rol |
 | `peliculas` | `/peliculas` | Conectado con la base de datos mediante Prisma |
 | `funciones` | `/funciones` | Conectado con la base de datos mediante Prisma |
 | `sucursales` | `/sucursales` | Conectado con la base de datos mediante Prisma |
@@ -456,6 +463,47 @@ Listas de solo lectura para armar los formularios (por ejemplo, los géneros y l
 
 `direccion` es solo la calle y el número: la ciudad y la provincia vienen aparte. `referencia` indica dónde queda el cine (por ejemplo, dentro de qué shopping) y es `null` si no se cargó. Los `enlaces` se devuelven ordenados por `tipo`.
 
+### Autenticación
+
+La única forma de crear un usuario es `POST /auth/register`: no existe `POST /users`. Quien se registra queda siempre como `cliente`, aunque envíe un `rol`; los administradores se cargan en la base o los promueve otro administrador.
+
+| Ruta | Qué hace | Respuestas |
+|---|---|---|
+| `POST /auth/register` | Registra un cliente con `nombre`, `apellido`, `correo` y `contrasena` (de 8 a 72 caracteres). Devuelve el token y el usuario | 201; 400 si falta un dato o no es válido; 409 si el correo ya está registrado |
+| `POST /auth/login` | Inicia sesión con `correo` y `contrasena`. Devuelve el token y el usuario | 200; 400 si faltan datos; 401 si el correo no existe o la contraseña no coincide (el mensaje es el mismo en los dos casos) |
+| `GET /auth/perfil` | Devuelve el usuario dueño del token | 200; 401 si falta el token, venció o no es válido |
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…",
+  "usuario": {
+    "id": 5,
+    "nombre": "Administrador",
+    "apellido": "Cine Tucumán",
+    "correo": "admin@cinetucuman.test",
+    "rol": "admin",
+    "creadoEn": "2026-11-19T14:53:08.880Z"
+  }
+}
+```
+
+El `access_token` se envía en cada pedido que lo requiera, en el encabezado `Authorization: Bearer <access_token>`. Lleva el `sub` (número de usuario), el `correo` y el `rol`, y vence según `JWT_EXPIRES_IN`. La contraseña se guarda cifrada con bcrypt (10 rondas) y nunca se devuelve. El correo se guarda en minúsculas, así que `Ana@Test.com` y `ana@test.com` son el mismo.
+
+Para probar los usuarios del seed: `admin@cinetucuman.test` (administrador) y `juan.decima@cinetucuman.test` (cliente), los dos con la contraseña `Prueba123!`.
+
+### Usuarios
+
+Todas las rutas piden el token (401 si falta o no es válido).
+
+| Ruta | Quién | Qué hace | Respuestas |
+|---|---|---|---|
+| `GET /users` | Administrador | Lista los usuarios | 200; 403 si no es administrador |
+| `GET /users/:id` | El propio usuario o un administrador | Un usuario por su número | 200; 400; 403 si es de otra persona; 404 |
+| `PATCH /users/:id` | El propio usuario o un administrador | Modifica `nombre`, `apellido`, `contrasena` o `rol`. Un cliente que cambia su contraseña debe enviar también `contrasenaActual`; el `rol` solo lo cambia un administrador | 200; 400 si un dato no es válido o falta `contrasenaActual`; 401 si `contrasenaActual` no coincide; 403; 404 |
+| `DELETE /users/:id` | Administrador | Elimina el usuario y devuelve lo que eliminó | 200; 403; 404; 409 si tiene órdenes |
+
+Por ahora los permisos de administrador se aplican solo a `/users`: las rutas de películas, funciones, sucursales y productos siguen abiertas, hasta que se conecte el panel de administración.
+
 ### Productos
 
 | Ruta | Qué hace | Respuestas |
@@ -491,7 +539,7 @@ En [`docs/postman/`](docs/postman) están la colección y el entorno:
 
 1. En Postman, **Import** y elegir `CineTucuman.postman_collection.json` y `CineTucuman.postman_environment.json`.
 2. Elegir el entorno **Cine Tucumán · local** (define `baseUrl` como `http://localhost:4000`; hay que cambiarla si el puerto del `.env` es otro).
-3. Con el servidor andando, ejecutar la colección: tiene una carpeta por módulo con sus peticiones, y cada una comprueba el código de respuesta. Las carpetas `peliculas`, `funciones`, `sucursales` y `productos` incluyen además los filtros, la búsqueda por `slug` y los casos de error (400, 404 y 409). Cada carpeta se ejecuta completa y en orden: crea un registro de prueba, lo modifica y lo elimina, así que la base queda como estaba.
+3. Con el servidor andando y la base cargada con los datos de ejemplo, ejecutar la colección: tiene una carpeta por módulo con sus peticiones, y cada una comprueba el código de respuesta. Las carpetas `auth` y `users` guardan solas el token que devuelve el login (variables `tokenCliente` y `tokenAdmin` de la colección) y lo usan en las peticiones siguientes. Las carpetas `peliculas`, `funciones`, `sucursales` y `productos` incluyen además los filtros, la búsqueda por `slug` y los casos de error (400, 404 y 409). Cada carpeta se ejecuta completa y en orden: crea un registro de prueba, lo modifica y lo elimina, así que la base queda como estaba.
 
 ## Estrategia de ramas
 
@@ -509,6 +557,6 @@ Cada rama sale de `dev`. Los cambios entran por un pull request con base `dev`, 
 ## Próximas etapas
 
 - Conectar con Prisma el módulo que falta: órdenes (con el precio calculado por el servidor y las butacas de cada entrada). Conviene mantener fija la versión 7.10.1 de `prisma`: la etiqueta `latest` del paquete apunta hoy a un candidato de la versión 8.
-- Registro e inicio de sesión con usuarios reales (`auth` y `users`).
+- Proteger con el rol de administrador las rutas que crean, modifican o eliminan películas, funciones, sucursales y productos.
 - Subida de pósters nuevos desde el panel de administración.
 - Conectar el frontend a esta API en lugar de sus datos locales.
