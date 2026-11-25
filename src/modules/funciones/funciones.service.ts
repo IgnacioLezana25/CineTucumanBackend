@@ -1,8 +1,8 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
-  BadRequestException,
 } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client.js';
 import {
@@ -12,12 +12,6 @@ import {
   inicioDelDiaSiguiente,
 } from '../comunes/horario-local.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import {
-  PRISMA_CLAVE_FORANEA,
-  PRISMA_CLAVE_UNICA,
-  PRISMA_NO_ENCONTRADO,
-  codigoDeError,
-} from '../prisma/prisma-error.util.js';
 import { CreateFuncionDto } from './dto/create-funcion.dto.js';
 import { FiltrarFuncionesDto } from './dto/filtrar-funciones.dto.js';
 import { UpdateFuncionDto } from './dto/update-funcion.dto.js';
@@ -54,12 +48,8 @@ export class FuncionesService {
     try {
       const funcion = await this.prisma.funcion.create({
         data: {
-          peliculaId: createFuncionDto.peliculaId,
-          salaId: createFuncionDto.salaId,
+          ...createFuncionDto,
           iniciaEn: new Date(createFuncionDto.iniciaEn),
-          formato: createFuncionDto.formato,
-          idioma: createFuncionDto.idioma ?? undefined,
-          precio: createFuncionDto.precio,
         },
         include: INCLUIR_DATOS,
       });
@@ -70,7 +60,7 @@ export class FuncionesService {
     }
   }
 
-  async findAll(filtros: FiltrarFuncionesDto = {}): Promise<Funcion[]> {
+  async findAll(filtros: FiltrarFuncionesDto): Promise<Funcion[]> {
     const funciones = await this.prisma.funcion.findMany({
       where: {
         peliculaId: filtros.peliculaId,
@@ -121,23 +111,21 @@ export class FuncionesService {
       throw new NotFoundException(`No existe una función con id ${id}.`);
     }
 
-    const ocupadas = new Set(
-      funcion.entradas.map((entrada) => entrada.butacaId),
-    );
+    const ocupadas = funcion.entradas.map((entrada) => entrada.butacaId);
 
     return {
       funcionId: funcion.id,
       salaId: funcion.salaId,
       sala: funcion.sala.nombre,
       capacidad: funcion.sala.butacas.length,
-      vendidas: ocupadas.size,
+      vendidas: ocupadas.length,
       butacas: funcion.sala.butacas.map((butaca) => ({
         id: butaca.id,
         codigo: `${butaca.fila}${butaca.numero}`,
         fila: butaca.fila,
         numero: butaca.numero,
         accesible: butaca.accesible,
-        ocupada: ocupadas.has(butaca.id),
+        ocupada: ocupadas.includes(butaca.id),
       })),
     };
   }
@@ -146,8 +134,15 @@ export class FuncionesService {
     id: number,
     updateFuncionDto: UpdateFuncionDto,
   ): Promise<Funcion> {
-    if (updateFuncionDto.salaId !== undefined) {
-      await this.verificarCambioDeSala(id, updateFuncionDto.salaId);
+    const actual = await this.findOne(id);
+    const cambiaDeSala =
+      updateFuncionDto.salaId !== undefined &&
+      updateFuncionDto.salaId !== actual.salaId;
+
+    if (cambiaDeSala && actual.vendidas > 0) {
+      throw new ConflictException(
+        'No se puede cambiar la sala de una función con entradas vendidas.',
+      );
     }
 
     try {
@@ -168,15 +163,13 @@ export class FuncionesService {
 
       return this.presentar(funcion);
     } catch (error) {
-      if (codigoDeError(error) === PRISMA_NO_ENCONTRADO) {
-        throw new NotFoundException(`No existe una función con id ${id}.`);
-      }
-
       throw this.traducirError(error);
     }
   }
 
   async remove(id: number): Promise<Funcion> {
+    await this.findOne(id);
+
     try {
       const funcion = await this.prisma.funcion.delete({
         where: { id },
@@ -185,13 +178,10 @@ export class FuncionesService {
 
       return this.presentar(funcion);
     } catch (error) {
-      const codigo = codigoDeError(error);
-
-      if (codigo === PRISMA_NO_ENCONTRADO) {
-        throw new NotFoundException(`No existe una función con id ${id}.`);
-      }
-
-      if (codigo === PRISMA_CLAVE_FORANEA) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
         throw new ConflictException(
           'No se puede eliminar la función porque tiene entradas vendidas.',
         );
@@ -201,55 +191,37 @@ export class FuncionesService {
     }
   }
 
-  private async verificarCambioDeSala(id: number, salaId: number) {
-    const actual = await this.prisma.funcion.findUnique({
-      where: { id },
-      select: { salaId: true, _count: { select: { entradas: true } } },
-    });
+  private rangoDeInicio(filtros: FiltrarFuncionesDto) {
+    const ahora = new Date();
+    const soloProximas = filtros.proximas === 'true';
 
-    if (!actual) {
-      throw new NotFoundException(`No existe una función con id ${id}.`);
+    if (filtros.fecha) {
+      const desde = inicioDelDia(filtros.fecha);
+
+      return {
+        gte: soloProximas && desde < ahora ? ahora : desde,
+        lt: inicioDelDiaSiguiente(filtros.fecha),
+      };
     }
 
-    if (actual.salaId !== salaId && actual._count.entradas > 0) {
-      throw new ConflictException(
-        'No se puede cambiar la sala de una función con entradas vendidas.',
-      );
-    }
-  }
-
-  private rangoDeInicio(
-    filtros: FiltrarFuncionesDto,
-  ): Prisma.DateTimeFilter | undefined {
-    const rango: Prisma.DateTimeFilter = {};
-
-    if (filtros.fecha !== undefined) {
-      rango.gte = inicioDelDia(filtros.fecha);
-      rango.lt = inicioDelDiaSiguiente(filtros.fecha);
+    if (soloProximas) {
+      return { gte: ahora };
     }
 
-    if (filtros.proximas === 'true') {
-      const ahora = new Date();
-
-      if (!(rango.gte instanceof Date) || rango.gte < ahora) {
-        rango.gte = ahora;
-      }
-    }
-
-    return Object.keys(rango).length > 0 ? rango : undefined;
+    return undefined;
   }
 
   private traducirError(error: unknown) {
-    const codigo = codigoDeError(error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2002') {
+        return new ConflictException(
+          'Ya hay una función en esa sala a esa hora.',
+        );
+      }
 
-    if (codigo === PRISMA_CLAVE_UNICA) {
-      return new ConflictException(
-        'Ya hay una función en esa sala a esa hora.',
-      );
-    }
-
-    if (codigo === PRISMA_CLAVE_FORANEA) {
-      return new BadRequestException('La película o la sala no existe.');
+      if (error.code === 'P2003') {
+        return new BadRequestException('La película o la sala no existe.');
+      }
     }
 
     return error;

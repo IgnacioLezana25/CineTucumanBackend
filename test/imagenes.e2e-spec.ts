@@ -262,11 +262,11 @@ describe('Imágenes subidas (e2e)', () => {
 
   it('si la base falla al guardar, borra la imagen que acababa de escribir', async () => {
     pelicula.findUnique.mockResolvedValue(peliculaEnBase);
-    pelicula.update.mockRejectedValue({ code: 'P2025' });
+    pelicula.update.mockRejectedValue(new Error('Se cortó la conexión.'));
 
     await subirPoster()
       .attach('archivo', png, { filename: 'a.png' })
-      .expect(404);
+      .expect(500);
 
     expect(await archivosDe('peliculas')).toEqual([]);
   });
@@ -287,6 +287,7 @@ describe('Imágenes subidas (e2e)', () => {
   it('DELETE /peliculas/:id borra también el póster subido', async () => {
     await mkdir(join(carpeta, 'peliculas'), { recursive: true });
     await writeFile(join(carpeta, 'peliculas', 'subido.png'), png);
+    pelicula.findUnique.mockResolvedValue(peliculaEnBase);
     pelicula.delete.mockResolvedValue({
       ...peliculaEnBase,
       posterArchivo: 'subido.png',

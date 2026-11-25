@@ -3,14 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client.js';
-import { PrismaService } from '../prisma/prisma.service.js';
 import {
-  PRISMA_CLAVE_FORANEA,
-  PRISMA_CLAVE_UNICA,
-  PRISMA_NO_ENCONTRADO,
-  codigoDeError,
-} from '../prisma/prisma-error.util.js';
+  Prisma,
+  Producto as ProductoEnBase,
+} from '../../generated/prisma/client.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateProductoDto } from './dto/create-producto.dto.js';
 import { FiltrarProductosDto } from './dto/filtrar-productos.dto.js';
 import { UpdateProductoDto } from './dto/update-producto.dto.js';
@@ -23,10 +20,7 @@ export class ProductosService {
   async create(createProductoDto: CreateProductoDto): Promise<Producto> {
     try {
       const producto = await this.prisma.producto.create({
-        data: {
-          ...createProductoDto,
-          descripcion: createProductoDto.descripcion ?? null,
-        },
+        data: createProductoDto,
       });
 
       return this.presentar(producto);
@@ -35,7 +29,7 @@ export class ProductosService {
     }
   }
 
-  async findAll(filtros: FiltrarProductosDto = {}): Promise<Producto[]> {
+  async findAll(filtros: FiltrarProductosDto): Promise<Producto[]> {
     const productos = await this.prisma.producto.findMany({
       where: {
         categoria: filtros.categoria,
@@ -72,6 +66,8 @@ export class ProductosService {
     id: number,
     updateProductoDto: UpdateProductoDto,
   ): Promise<Producto> {
+    await this.findOne(id);
+
     try {
       const producto = await this.prisma.producto.update({
         where: { id },
@@ -87,47 +83,39 @@ export class ProductosService {
 
       return this.presentar(producto);
     } catch (error) {
-      if (codigoDeError(error) === PRISMA_NO_ENCONTRADO) {
-        throw new NotFoundException(`No existe un producto con id ${id}.`);
-      }
-
       throw this.traducirError(error);
     }
   }
 
   async remove(id: number): Promise<Producto> {
+    await this.findOne(id);
+
     try {
       const producto = await this.prisma.producto.delete({ where: { id } });
 
       return this.presentar(producto);
     } catch (error) {
-      const codigo = codigoDeError(error);
-
-      if (codigo === PRISMA_NO_ENCONTRADO) {
-        throw new NotFoundException(`No existe un producto con id ${id}.`);
-      }
-
-      if (codigo === PRISMA_CLAVE_FORANEA) {
-        throw new ConflictException(
-          'No se puede eliminar el producto porque figura en órdenes. Se puede desactivar con activo en false.',
-        );
-      }
-
-      throw error;
+      throw this.traducirError(error);
     }
   }
 
   private traducirError(error: unknown) {
-    if (codigoDeError(error) === PRISMA_CLAVE_UNICA) {
-      return new ConflictException('Ya existe un producto con ese slug.');
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2002') {
+        return new ConflictException('Ya existe un producto con ese slug.');
+      }
+
+      if (error.code === 'P2003') {
+        return new ConflictException(
+          'No se puede eliminar el producto porque figura en órdenes. Se puede desactivar con activo en false.',
+        );
+      }
     }
 
     return error;
   }
 
-  private presentar(
-    producto: Prisma.ProductoGetPayload<Record<string, never>>,
-  ): Producto {
+  private presentar(producto: ProductoEnBase): Producto {
     return {
       id: producto.id,
       slug: producto.slug,

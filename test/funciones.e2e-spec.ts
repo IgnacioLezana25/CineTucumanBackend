@@ -5,6 +5,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/modules/app/app.module.js';
 import { PrismaService } from './../src/modules/prisma/prisma.service.js';
+import { errorDePrisma } from './error-de-prisma.js';
 
 const funcionEnBase = {
   id: 6,
@@ -45,6 +46,7 @@ describe('Funciones (e2e)', () => {
 
   beforeEach(async () => {
     vi.resetAllMocks();
+    funcion.findUnique.mockResolvedValue(funcionEnBase);
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -290,8 +292,8 @@ describe('Funciones (e2e)', () => {
   });
 
   it('POST /funciones traduce los errores de la base: 409 si la sala ya tiene una función a esa hora y 400 si la película o la sala no existen', async () => {
-    funcion.create.mockRejectedValueOnce({ code: 'P2002' });
-    funcion.create.mockRejectedValueOnce({ code: 'P2003' });
+    funcion.create.mockRejectedValueOnce(errorDePrisma('P2002'));
+    funcion.create.mockRejectedValueOnce(errorDePrisma('P2003'));
 
     await request(app.getHttpServer())
       .post('/funciones')
@@ -316,12 +318,12 @@ describe('Funciones (e2e)', () => {
 
     expect(respuesta.body.precio).toBe(9000);
     expect(funcion.update.mock.calls[0][0].data.salaId).toBeUndefined();
-    expect(funcion.findUnique).not.toHaveBeenCalled();
+    expect(funcion.findUnique).toHaveBeenCalledTimes(1);
   });
 
   it('PATCH /funciones/:id responde 404 si no existe y 409 si hay un choque de horario', async () => {
-    funcion.update.mockRejectedValueOnce({ code: 'P2025' });
-    funcion.update.mockRejectedValueOnce({ code: 'P2002' });
+    funcion.findUnique.mockResolvedValueOnce(null);
+    funcion.update.mockRejectedValueOnce(errorDePrisma('P2002'));
 
     await request(app.getHttpServer())
       .patch('/funciones/99')
@@ -337,6 +339,7 @@ describe('Funciones (e2e)', () => {
 
   it('PATCH /funciones/:id no deja cambiar la sala si ya hay entradas vendidas', async () => {
     funcion.findUnique.mockResolvedValue({
+      ...funcionEnBase,
       salaId: 9,
       _count: { entradas: 2 },
     });
@@ -351,6 +354,7 @@ describe('Funciones (e2e)', () => {
 
   it('PATCH /funciones/:id deja cambiar la sala si no hay entradas y responde 404 si la función no existe', async () => {
     funcion.findUnique.mockResolvedValueOnce({
+      ...funcionEnBase,
       salaId: 9,
       _count: { entradas: 0 },
     });
@@ -370,9 +374,11 @@ describe('Funciones (e2e)', () => {
   });
 
   it('DELETE /funciones/:id elimina la función, responde 404 si no existe y 409 si tiene entradas vendidas', async () => {
+    funcion.findUnique.mockImplementation(({ where }) =>
+      Promise.resolve(where.id === 99 ? null : funcionEnBase),
+    );
     funcion.delete.mockResolvedValueOnce(funcionEnBase);
-    funcion.delete.mockRejectedValueOnce({ code: 'P2025' });
-    funcion.delete.mockRejectedValueOnce({ code: 'P2003' });
+    funcion.delete.mockRejectedValueOnce(errorDePrisma('P2003'));
 
     const eliminada = await request(app.getHttpServer())
       .delete('/funciones/6')
