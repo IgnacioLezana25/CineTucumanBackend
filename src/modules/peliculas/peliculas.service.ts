@@ -10,12 +10,6 @@ import { urlBaseDeLaApi, urlDeImagen } from '../comunes/url-publica.util.js';
 import { ArchivoSubido } from '../imagenes/archivo-subido.types.js';
 import { ImagenesService } from '../imagenes/imagenes.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import {
-  PRISMA_CLAVE_FORANEA,
-  PRISMA_CLAVE_UNICA,
-  PRISMA_NO_ENCONTRADO,
-  codigoDeError,
-} from '../prisma/prisma-error.util.js';
 import { CreatePeliculaDto } from './dto/create-pelicula.dto.js';
 import { FiltrarPeliculasDto } from './dto/filtrar-peliculas.dto.js';
 import { UpdatePeliculaDto } from './dto/update-pelicula.dto.js';
@@ -50,14 +44,7 @@ export class PeliculasService {
       const pelicula = await this.prisma.pelicula.create({
         data: {
           ...datos,
-          tituloOriginal: datos.tituloOriginal ?? null,
-          sinopsis: datos.sinopsis ?? null,
-          duracionMinutos: datos.duracionMinutos ?? null,
-          clasificacionId: datos.clasificacionId ?? null,
-          trailerYoutube: datos.trailerYoutube ?? null,
-          director: datos.director ?? null,
-          paisOrigen: datos.paisOrigen ?? null,
-          fechaEstreno: this.convertirFecha(fechaEstreno) ?? null,
+          fechaEstreno: this.convertirFecha(fechaEstreno),
           generos: {
             create: (generoIds ?? []).map((generoId) => ({ generoId })),
           },
@@ -72,7 +59,7 @@ export class PeliculasService {
     }
   }
 
-  async findAll(filtros: FiltrarPeliculasDto = {}): Promise<Pelicula[]> {
+  async findAll(filtros: FiltrarPeliculasDto): Promise<Pelicula[]> {
     const peliculas = await this.prisma.pelicula.findMany({
       where: {
         estado: filtros.estado,
@@ -123,6 +110,8 @@ export class PeliculasService {
   ): Promise<Pelicula> {
     const { generoIds, reparto, fechaEstreno, ...datos } = updatePeliculaDto;
 
+    await this.findOne(id);
+
     try {
       const pelicula = await this.prisma.pelicula.update({
         where: { id },
@@ -149,53 +138,37 @@ export class PeliculasService {
 
       return this.presentar(pelicula);
     } catch (error) {
-      if (codigoDeError(error) === PRISMA_NO_ENCONTRADO) {
-        throw new NotFoundException(`No existe una película con id ${id}.`);
-      }
-
       throw this.traducirError(error);
     }
   }
 
   async subirPoster(id: number, archivo?: ArchivoSubido): Promise<Pelicula> {
-    const pelicula = await this.prisma.pelicula.findUnique({
-      where: { id },
-      include: INCLUIR_RELACIONES,
-    });
-
-    if (!pelicula) {
-      throw new NotFoundException(`No existe una película con id ${id}.`);
-    }
-
+    const pelicula = await this.findOne(id);
     const posterNuevo = await this.imagenes.guardar(
       'peliculas',
       pelicula.slug,
       archivo,
     );
-    let actualizada: PeliculaConRelaciones;
 
     try {
-      actualizada = await this.prisma.pelicula.update({
+      const actualizada = await this.prisma.pelicula.update({
         where: { id },
         data: { posterArchivo: posterNuevo },
         include: INCLUIR_RELACIONES,
       });
+
+      await this.imagenes.eliminar('peliculas', pelicula.posterArchivo);
+
+      return this.presentar(actualizada);
     } catch (error) {
       await this.imagenes.eliminar('peliculas', posterNuevo);
-
-      if (codigoDeError(error) === PRISMA_NO_ENCONTRADO) {
-        throw new NotFoundException(`No existe una película con id ${id}.`);
-      }
-
       throw error;
     }
-
-    await this.imagenes.eliminar('peliculas', pelicula.posterArchivo);
-
-    return this.presentar(actualizada);
   }
 
   async remove(id: number): Promise<Pelicula> {
+    await this.findOne(id);
+
     try {
       const pelicula = await this.prisma.pelicula.delete({
         where: { id },
@@ -206,13 +179,10 @@ export class PeliculasService {
 
       return this.presentar(pelicula);
     } catch (error) {
-      const codigo = codigoDeError(error);
-
-      if (codigo === PRISMA_NO_ENCONTRADO) {
-        throw new NotFoundException(`No existe una película con id ${id}.`);
-      }
-
-      if (codigo === PRISMA_CLAVE_FORANEA) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
         throw new ConflictException(
           'No se puede eliminar la película porque tiene funciones.',
         );
@@ -230,23 +200,25 @@ export class PeliculasService {
     }));
   }
 
-  private convertirFecha(fecha: string | null | undefined) {
-    if (fecha === undefined || fecha === null) return fecha;
+  private convertirFecha(fecha?: string | null) {
+    if (!fecha) {
+      return fecha;
+    }
 
     return new Date(`${fecha}T00:00:00.000Z`);
   }
 
   private traducirError(error: unknown) {
-    const codigo = codigoDeError(error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2002') {
+        return new ConflictException('Ya existe una película con ese slug.');
+      }
 
-    if (codigo === PRISMA_CLAVE_UNICA) {
-      return new ConflictException('Ya existe una película con ese slug.');
-    }
-
-    if (codigo === PRISMA_CLAVE_FORANEA) {
-      return new BadRequestException(
-        'La clasificación o alguno de los géneros no existe.',
-      );
+      if (error.code === 'P2003') {
+        return new BadRequestException(
+          'La clasificación o alguno de los géneros no existe.',
+        );
+      }
     }
 
     return error;

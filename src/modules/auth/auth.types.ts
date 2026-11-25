@@ -1,17 +1,15 @@
 import { Request } from 'express';
 
-export type Rol = 'cliente' | 'admin';
-
 export interface PayloadJwt {
   sub: number;
   correo: string;
-  rol: Rol;
+  rol: string;
 }
 
 export interface UsuarioAutenticado {
   id: number;
   correo: string;
-  rol: Rol;
+  rol: string;
 }
 
 export type SolicitudAutenticada = Request & { usuario?: UsuarioAutenticado };

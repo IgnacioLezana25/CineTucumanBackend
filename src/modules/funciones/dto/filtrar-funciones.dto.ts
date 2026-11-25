@@ -1,23 +1,31 @@
-import { IsIn, IsISO8601, IsOptional, Matches } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsIn,
+  IsInt,
+  IsISO8601,
+  IsOptional,
+  IsPositive,
+  Matches,
+} from 'class-validator';
 
 export class FiltrarFuncionesDto {
   @IsOptional()
-  @Matches(/^[1-9]\d*$/, {
-    message: 'peliculaId debe ser un número entero positivo',
-  })
-  peliculaId?: string;
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  peliculaId?: number;
 
   @IsOptional()
-  @Matches(/^[1-9]\d*$/, {
-    message: 'sucursalId debe ser un número entero positivo',
-  })
-  sucursalId?: string;
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  sucursalId?: number;
 
   @IsOptional()
-  @Matches(/^[1-9]\d*$/, {
-    message: 'salaId debe ser un número entero positivo',
-  })
-  salaId?: string;
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  salaId?: number;
 
   @IsOptional()
   @IsISO8601({ strict: true })

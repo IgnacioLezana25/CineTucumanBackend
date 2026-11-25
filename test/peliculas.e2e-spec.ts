@@ -5,6 +5,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/modules/app/app.module.js';
 import { PrismaService } from './../src/modules/prisma/prisma.service.js';
+import { errorDePrisma } from './error-de-prisma.js';
 
 const peliculaEnBase = {
   id: 1,
@@ -56,6 +57,7 @@ describe('Peliculas (e2e)', () => {
 
   beforeEach(async () => {
     vi.resetAllMocks();
+    pelicula.findUnique.mockResolvedValue(peliculaEnBase);
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -66,7 +68,11 @@ describe('Peliculas (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
     );
     await app.init();
 
@@ -162,7 +168,7 @@ describe('Peliculas (e2e)', () => {
 
     expect(datos.fechaEstreno).toEqual(new Date('2026-07-30T00:00:00.000Z'));
     expect(datos.generos).toEqual({ create: [{ generoId: 4 }] });
-    expect(datos.sinopsis).toBeNull();
+    expect(datos.sinopsis).toBeUndefined();
   });
 
   it('POST /peliculas con reparto lo guarda numerado en el orden recibido', async () => {
@@ -222,7 +228,7 @@ describe('Peliculas (e2e)', () => {
   });
 
   it('POST /peliculas con un slug repetido responde 409', async () => {
-    pelicula.create.mockRejectedValue({ code: 'P2002' });
+    pelicula.create.mockRejectedValue(errorDePrisma('P2002'));
 
     await request(app.getHttpServer())
       .post('/peliculas')
@@ -232,7 +238,7 @@ describe('Peliculas (e2e)', () => {
   });
 
   it('POST /peliculas con una clasificación inexistente responde 400', async () => {
-    pelicula.create.mockRejectedValue({ code: 'P2003' });
+    pelicula.create.mockRejectedValue(errorDePrisma('P2003'));
 
     await request(app.getHttpServer())
       .post('/peliculas')
@@ -242,7 +248,7 @@ describe('Peliculas (e2e)', () => {
   });
 
   it('PATCH /peliculas/:id inexistente responde 404', async () => {
-    pelicula.update.mockRejectedValue({ code: 'P2025' });
+    pelicula.findUnique.mockResolvedValue(null);
 
     await request(app.getHttpServer())
       .patch('/peliculas/99')
@@ -297,7 +303,7 @@ describe('Peliculas (e2e)', () => {
   });
 
   it('DELETE /peliculas/:id con funciones responde 409', async () => {
-    pelicula.delete.mockRejectedValue({ code: 'P2003' });
+    pelicula.delete.mockRejectedValue(errorDePrisma('P2003'));
 
     await request(app.getHttpServer())
       .delete('/peliculas/1')

@@ -44,8 +44,11 @@ export class ImagenesService {
     return nombre;
   }
 
-  async eliminar(carpeta: CarpetaDeImagenes, nombre: string): Promise<void> {
-    if (basename(nombre) !== nombre) {
+  async eliminar(
+    carpeta: CarpetaDeImagenes,
+    nombre: string | null,
+  ): Promise<void> {
+    if (!nombre || basename(nombre) !== nombre) {
       return;
     }
 

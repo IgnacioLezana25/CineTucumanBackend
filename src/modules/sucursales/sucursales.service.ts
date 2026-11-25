@@ -10,12 +10,6 @@ import { urlBaseDeLaApi, urlDeImagen } from '../comunes/url-publica.util.js';
 import { ArchivoSubido } from '../imagenes/archivo-subido.types.js';
 import { ImagenesService } from '../imagenes/imagenes.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import {
-  PRISMA_CLAVE_FORANEA,
-  PRISMA_CLAVE_UNICA,
-  PRISMA_NO_ENCONTRADO,
-  codigoDeError,
-} from '../prisma/prisma-error.util.js';
 import { CreateSucursalDto } from './dto/create-sucursal.dto.js';
 import { FiltrarSucursalesDto } from './dto/filtrar-sucursales.dto.js';
 import { UpdateSucursalDto } from './dto/update-sucursal.dto.js';
@@ -49,9 +43,6 @@ export class SucursalesService {
       const sucursal = await this.prisma.sucursal.create({
         data: {
           ...datos,
-          descripcion: datos.descripcion ?? null,
-          referencia: datos.referencia ?? null,
-          imagenArchivo: datos.imagenArchivo ?? null,
           enlaces: { create: enlaces ?? [] },
         },
         include: INCLUIR_RELACIONES,
@@ -63,7 +54,7 @@ export class SucursalesService {
     }
   }
 
-  async findAll(filtros: FiltrarSucursalesDto = {}): Promise<Sucursal[]> {
+  async findAll(filtros: FiltrarSucursalesDto): Promise<Sucursal[]> {
     const sucursales = await this.prisma.sucursal.findMany({
       where: {
         destacada:
@@ -110,6 +101,8 @@ export class SucursalesService {
   ): Promise<Sucursal> {
     const { enlaces, ...datos } = updateSucursalDto;
 
+    await this.findOne(id);
+
     try {
       const sucursal = await this.prisma.sucursal.update({
         where: { id },
@@ -127,74 +120,51 @@ export class SucursalesService {
 
       return this.presentar(sucursal);
     } catch (error) {
-      if (codigoDeError(error) === PRISMA_NO_ENCONTRADO) {
-        throw new NotFoundException(`No existe una sucursal con id ${id}.`);
-      }
-
       throw this.traducirError(error);
     }
   }
 
   async subirImagen(id: number, archivo?: ArchivoSubido): Promise<Sucursal> {
-    const sucursal = await this.prisma.sucursal.findUnique({
-      where: { id },
-      include: INCLUIR_RELACIONES,
-    });
-
-    if (!sucursal) {
-      throw new NotFoundException(`No existe una sucursal con id ${id}.`);
-    }
-
+    const sucursal = await this.findOne(id);
     const imagenNueva = await this.imagenes.guardar(
       'sucursales',
       sucursal.slug,
       archivo,
     );
-    let actualizada: SucursalConRelaciones;
 
     try {
-      actualizada = await this.prisma.sucursal.update({
+      const actualizada = await this.prisma.sucursal.update({
         where: { id },
         data: { imagenArchivo: imagenNueva },
         include: INCLUIR_RELACIONES,
       });
+
+      await this.imagenes.eliminar('sucursales', sucursal.imagenArchivo);
+
+      return this.presentar(actualizada);
     } catch (error) {
       await this.imagenes.eliminar('sucursales', imagenNueva);
-
-      if (codigoDeError(error) === PRISMA_NO_ENCONTRADO) {
-        throw new NotFoundException(`No existe una sucursal con id ${id}.`);
-      }
-
       throw error;
     }
-
-    if (sucursal.imagenArchivo) {
-      await this.imagenes.eliminar('sucursales', sucursal.imagenArchivo);
-    }
-
-    return this.presentar(actualizada);
   }
 
   async remove(id: number): Promise<Sucursal> {
+    await this.findOne(id);
+
     try {
       const sucursal = await this.prisma.sucursal.delete({
         where: { id },
         include: INCLUIR_RELACIONES,
       });
 
-      if (sucursal.imagenArchivo) {
-        await this.imagenes.eliminar('sucursales', sucursal.imagenArchivo);
-      }
+      await this.imagenes.eliminar('sucursales', sucursal.imagenArchivo);
 
       return this.presentar(sucursal);
     } catch (error) {
-      const codigo = codigoDeError(error);
-
-      if (codigo === PRISMA_NO_ENCONTRADO) {
-        throw new NotFoundException(`No existe una sucursal con id ${id}.`);
-      }
-
-      if (codigo === PRISMA_CLAVE_FORANEA) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
         throw new ConflictException(
           'No se puede eliminar la sucursal porque sus salas tienen funciones.',
         );
@@ -205,14 +175,14 @@ export class SucursalesService {
   }
 
   private traducirError(error: unknown) {
-    const codigo = codigoDeError(error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2002') {
+        return new ConflictException('Ya existe una sucursal con ese slug.');
+      }
 
-    if (codigo === PRISMA_CLAVE_UNICA) {
-      return new ConflictException('Ya existe una sucursal con ese slug.');
-    }
-
-    if (codigo === PRISMA_CLAVE_FORANEA) {
-      return new BadRequestException('La ciudad no existe.');
+      if (error.code === 'P2003') {
+        return new BadRequestException('La ciudad no existe.');
+      }
     }
 
     return error;
