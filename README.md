@@ -88,6 +88,19 @@ export class CreatePeliculaDto {
 }
 ```
 
+El pipe se crea con dos opciones:
+
+```ts
+app.useGlobalPipes(
+  new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+);
+```
+
+- `whitelist: true` deja pasar solo los campos que el dto declara con algún decorador.
+- `forbidNonWhitelisted: true` hace que un campo de más no se descarte en silencio sino que se rechace con `400` y el mensaje `property <campo> should not exist`. Así, por ejemplo, nadie puede registrarse enviando `"rol": "admin"` ni mandar el precio de una entrada, y un dato inesperado nunca llega a la base de datos.
+
+Vale tanto para el cuerpo como para los filtros de la URL (`?estado=…`): un filtro que no existe también responde `400`.
+
 ## Base de datos
 
 Los scripts están en la carpeta [`database/`](database). Se necesita PostgreSQL instalado y `psql` disponible en la terminal.
@@ -470,7 +483,7 @@ Listas de solo lectura para armar los formularios (por ejemplo, los géneros y l
 
 ### Autenticación
 
-La única forma de crear un usuario es `POST /auth/register`: no existe `POST /users`. Quien se registra queda siempre como `cliente`, aunque envíe un `rol`; los administradores se cargan en la base o los promueve otro administrador.
+La única forma de crear un usuario es `POST /auth/register`: no existe `POST /users`. Quien se registra queda siempre como `cliente`: si el cuerpo trae un `rol`, la API responde 400. Los administradores se cargan en la base o los promueve otro administrador.
 
 | Ruta | Qué hace | Respuestas |
 |---|---|---|
@@ -557,7 +570,7 @@ El cuerpo del `POST` es solo lo que se compra:
 }
 ```
 
-El usuario sale del token y los precios, de la base: si el cuerpo trae `usuarioId`, `estado` o un precio, se ignora. La respuesta es la orden con su detalle:
+El usuario sale del token y los precios, de la base: si el cuerpo trae `usuarioId`, `estado` o un precio, la API responde 400. La respuesta es la orden con su detalle:
 
 ```json
 {

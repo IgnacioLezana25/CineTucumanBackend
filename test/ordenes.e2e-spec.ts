@@ -88,7 +88,9 @@ describe('Ordenes (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe());
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+    );
     await app.init();
 
     const jwt = app.get(JwtService);
@@ -135,10 +137,8 @@ describe('Ordenes (e2e)', () => {
     prisma.orden.create.mockResolvedValue(ordenEnBase());
 
     const respuesta = await comprar({
-      usuarioId: 99,
-      estado: 'cancelada',
-      entradas: [{ funcionId: 10, butacaId: 103, precioUnitario: 1 }],
-      productos: [{ productoId: 1, cantidad: 2, precio: 1 }],
+      entradas: [{ funcionId: 10, butacaId: 103 }],
+      productos: [{ productoId: 1, cantidad: 2 }],
     }).expect(201);
 
     const datos = prisma.orden.create.mock.calls[0][0].data;
@@ -175,6 +175,21 @@ describe('Ordenes (e2e)', () => {
         },
       ],
     });
+  });
+
+  it('POST /ordenes rechaza con 400 a quien envía el usuario, el estado o los precios', async () => {
+    const cuerposConDatosDeMas = [
+      { usuarioId: 99, entradas: [{ funcionId: 10, butacaId: 103 }] },
+      { estado: 'cancelada', productos: [{ productoId: 1, cantidad: 1 }] },
+      { entradas: [{ funcionId: 10, butacaId: 103, precioUnitario: 1 }] },
+      { productos: [{ productoId: 1, cantidad: 2, precio: 1 }] },
+    ];
+
+    for (const cuerpo of cuerposConDatosDeMas) {
+      await comprar(cuerpo).expect(400);
+    }
+
+    expect(prisma.orden.create).not.toHaveBeenCalled();
   });
 
   it('POST /ordenes puede ser solo de Candy Bar o solo de entradas', async () => {
