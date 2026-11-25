@@ -115,18 +115,14 @@ export class OrdenesService {
     if (
       !esAdmin &&
       filtros.usuarioId !== undefined &&
-      Number(filtros.usuarioId) !== solicitante.id
+      filtros.usuarioId !== solicitante.id
     ) {
       throw new ForbiddenException('Solo podés ver tus propias órdenes.');
     }
 
     const ordenes = await this.prisma.orden.findMany({
       where: {
-        usuarioId: esAdmin
-          ? filtros.usuarioId === undefined
-            ? undefined
-            : Number(filtros.usuarioId)
-          : solicitante.id,
+        usuarioId: esAdmin ? filtros.usuarioId : solicitante.id,
         estado: filtros.estado,
       },
       include: INCLUIR_DETALLE,

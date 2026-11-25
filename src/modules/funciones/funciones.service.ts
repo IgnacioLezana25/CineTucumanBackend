@@ -73,12 +73,11 @@ export class FuncionesService {
   async findAll(filtros: FiltrarFuncionesDto = {}): Promise<Funcion[]> {
     const funciones = await this.prisma.funcion.findMany({
       where: {
-        peliculaId: this.aNumero(filtros.peliculaId),
-        salaId: this.aNumero(filtros.salaId),
-        sala:
-          filtros.sucursalId === undefined
-            ? undefined
-            : { sucursalId: Number(filtros.sucursalId) },
+        peliculaId: filtros.peliculaId,
+        salaId: filtros.salaId,
+        sala: filtros.sucursalId
+          ? { sucursalId: filtros.sucursalId }
+          : undefined,
         formato: filtros.formato,
         iniciaEn: this.rangoDeInicio(filtros),
       },
@@ -217,10 +216,6 @@ export class FuncionesService {
         'No se puede cambiar la sala de una función con entradas vendidas.',
       );
     }
-  }
-
-  private aNumero(valor?: string): number | undefined {
-    return valor === undefined ? undefined : Number(valor);
   }
 
   private rangoDeInicio(
