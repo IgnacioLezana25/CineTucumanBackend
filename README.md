@@ -55,7 +55,6 @@ DATABASE_URL=postgresql://usuario:password@localhost:5432/cine_tucuman
 API_BASE_URL=http://localhost:4000/
 FRONTEND_URL=http://localhost:5173
 JWT_SECRET=una-frase-larga-y-secreta-de-al-menos-32-caracteres
-JWT_EXPIRES_IN=1h
 ```
 
 | Variable | Qué guarda |
@@ -64,8 +63,7 @@ JWT_EXPIRES_IN=1h
 | `DATABASE_URL` | La conexión a la base de datos PostgreSQL: usuario, contraseña, servidor, puerto y nombre |
 | `API_BASE_URL` | La dirección base de la API: se muestra al arrancar y se usa para armar la dirección completa de los pósters |
 | `FRONTEND_URL` | Desde dónde se permite llamar a la API (CORS). Si falta, usa `http://localhost:5173`. Admite varias direcciones separadas por coma |
-| `JWT_SECRET` | **Obligatoria.** El secreto con el que se firman los tokens de acceso, de **al menos 32 caracteres**. Si falta o es más corta, la API no arranca y lo avisa. Cada integrante usa la suya y nunca se sube a GitHub |
-| `JWT_EXPIRES_IN` | Cuánto dura un token: `1h`, `30m`, `7d` o una cantidad de segundos. Si falta, dura una hora |
+| `JWT_SECRET` | **Obligatoria.** El secreto con el que se firman los tokens de acceso. Conviene que sea una frase larga y difícil de adivinar (por ejemplo, de 32 caracteres o más). Si falta, la API no arranca y lo avisa. Cada integrante usa la suya y nunca se sube a GitHub |
 | `UPLOADS_DIR` | Opcional. La carpeta donde se guardan las imágenes subidas desde la API. Si falta, usa `uploads` (dentro del proyecto, fuera de Git) |
 
 Una forma de generar un `JWT_SECRET` seguro: `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`.
@@ -85,6 +83,35 @@ export class CreatePeliculaDto {
   @IsString()
   @IsNotEmpty()
   titulo: string;
+}
+```
+
+El pipe se crea con tres opciones:
+
+```ts
+app.useGlobalPipes(
+  new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+  }),
+);
+```
+
+- `whitelist: true` deja pasar solo los campos que el dto declara con algún decorador.
+- `forbidNonWhitelisted: true` hace que un campo de más no se descarte en silencio sino que se rechace con `400` y el mensaje `property <campo> should not exist`. Así, por ejemplo, nadie puede registrarse enviando `"rol": "admin"` ni mandar el precio de una entrada, y un dato inesperado nunca llega a la base de datos.
+
+Vale tanto para el cuerpo como para los filtros de la URL (`?estado=…`): un filtro que no existe también responde `400`.
+
+La tercera opción, `transform: true`, convierte lo que llega en una instancia del dto. Junto con `@Type(() => Number)` de `class-transformer`, sirve para los filtros numéricos de la URL, que siempre llegan como texto: `?peliculaId=3` llega al service como el número `3`, y `?peliculaId=abc` responde `400`.
+
+```ts
+export class FiltrarFuncionesDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  peliculaId?: number;
 }
 ```
 
@@ -281,6 +308,25 @@ Una base nueva, creada con `schema.sql` y `seed.sql`, ya los trae.
 
 Si se cambia `prisma/schema.prisma`, hay que volver a ejecutar `npx prisma generate`. Para comprobar que el esquema no tiene errores: `npx prisma validate`.
 
+**Errores de la base en los services.** Antes de modificar o eliminar, el service busca el registro con su `findOne` y, si no existe, responde 404. Los errores que solo la base puede detectar se atrapan con `Prisma.PrismaClientKnownRequestError` y se traducen a un código para el frontend:
+
+| Código de Prisma | Qué pasó | Respuesta de la API |
+|---|---|---|
+| `P2002` | Se repite un valor único (un `slug`, un correo, una butaca ya vendida) | 409 |
+| `P2003` | Una clave foránea no existe (400, por ejemplo una clasificación inexistente) o el registro tiene otros que dependen de él y no se puede eliminar (409) | 400 o 409 |
+
+```ts
+try {
+  return await this.prisma.usuario.create({ data, omit: { contrasenaHash: true } });
+} catch (error) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    throw new ConflictException('Ya existe un usuario con ese correo.');
+  }
+
+  throw error;
+}
+```
+
 ## Estructura del proyecto
 
 ```
@@ -309,9 +355,29 @@ src/
 
 Cada módulo se creó con `npx nest g resource modules/<nombre>` y tiene su controlador, su servicio, su módulo y las carpetas `dto/` y `entities/`. **Cada módulo nuevo hay que importarlo en la propiedad `imports` de `AppModule`** (`src/modules/app/app.module.ts`); el generador de Nest no lo hace solo porque ese archivo no está en la raíz de `src`.
 
+## Inyección de dependencias
+
+Nest crea los services y se los pasa a quien los necesita por el **constructor**. Por ejemplo, `PeliculasService` recibe tres dependencias:
+
+```ts
+@Injectable()
+export class PeliculasService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly imagenes: ImagenesService,
+    configuracion: ConfigService,
+  ) {}
+}
+```
+
+- La clase que se inyecta lleva `@Injectable()` y tiene que estar disponible en el módulo: en sus `providers`, exportada por un módulo que se importa (`ImagenesModule` exporta `ImagenesService`) o en un módulo global (`PrismaModule`, `ConfigModule` y `JwtModule`).
+- Se pueden inyectar todas las que hagan falta, separadas por coma en el constructor. Lo mismo vale para los controladores, que reciben su service, y para los guards, que reciben `JwtService` o `Reflector`.
+
 ## Módulos y rutas
 
-Los módulos de datos tienen las cinco rutas que genera Nest, con su nombre como prefijo: `GET /<módulo>`, `GET /<módulo>/:id`, `POST /<módulo>`, `PATCH /<módulo>/:id` y `DELETE /<módulo>/:id`. Además, `GET /` devuelve un saludo.
+Cada módulo tiene solo las rutas que necesita. Películas, funciones, sucursales y productos tienen el CRUD completo (`GET`, `POST`, `PATCH` y `DELETE`). Catálogos es solo de lectura. Los usuarios no tienen `POST`, porque se crean con el registro. Las órdenes no se modifican ni se eliminan, solo se cancelan. Además, `GET /` devuelve un saludo.
+
+**Dónde se define cada endpoint.** En el controlador de cada módulo: `@Controller('peliculas')` pone el prefijo y cada método lleva el verbo y el resto de la ruta, por ejemplo `@Get(':id')` para `GET /peliculas/:id`. El controlador solo recibe el pedido y llama al service, que tiene la lógica. Al arrancar la API, Nest muestra en la consola cada ruta registrada, como `Mapped {/peliculas/:id, GET} route`.
 
 | Módulo | Prefijo | Estado |
 |---|---|---|
@@ -470,7 +536,7 @@ Listas de solo lectura para armar los formularios (por ejemplo, los géneros y l
 
 ### Autenticación
 
-La única forma de crear un usuario es `POST /auth/register`: no existe `POST /users`. Quien se registra queda siempre como `cliente`, aunque envíe un `rol`; los administradores se cargan en la base o los promueve otro administrador.
+La única forma de crear un usuario es `POST /auth/register`: no existe `POST /users`. Quien se registra queda siempre como `cliente`: si el cuerpo trae un `rol`, la API responde 400. Los administradores se cargan en la base o los promueve otro administrador.
 
 | Ruta | Qué hace | Respuestas |
 |---|---|---|
@@ -492,9 +558,20 @@ La única forma de crear un usuario es `POST /auth/register`: no existe `POST /u
 }
 ```
 
-El `access_token` se envía en cada pedido que lo requiera, en el encabezado `Authorization: Bearer <access_token>`. Lleva el `sub` (número de usuario), el `correo` y el `rol`, y vence según `JWT_EXPIRES_IN`. La contraseña se guarda cifrada con bcrypt (10 rondas) y nunca se devuelve. El correo se guarda en minúsculas, así que `Ana@Test.com` y `ana@test.com` son el mismo.
+El `access_token` se envía en cada pedido que lo requiera, en el encabezado `Authorization: Bearer <access_token>`. Lleva el `sub` (número de usuario), el `correo` y el `rol`, y vence a la hora de haberse creado. La contraseña se guarda cifrada con bcrypt (10 rondas) y nunca se devuelve. El correo se guarda en minúsculas, así que `Ana@Test.com` y `ana@test.com` son el mismo.
 
 Para probar los usuarios del seed: `admin@cinetucuman.test` (administrador) y `juan.decima@cinetucuman.test` (cliente), los dos con la contraseña `Prueba123!`.
+
+**Cómo funciona por dentro:**
+
+| Paso | Dónde está |
+|---|---|
+| Configurar JWT: `JwtModule.registerAsync` con el secreto de `JWT_SECRET`, una hora de duración y `global: true`, para que `JwtService` esté disponible en todos los módulos | `src/modules/auth/auth.module.ts` |
+| Cifrar la contraseña al registrarse o al cambiarla: `bcrypt.hash(contrasena, 10)` | `src/modules/users/users.service.ts` |
+| Iniciar sesión: buscar el usuario por correo, comparar con `bcrypt.compare` y firmar el token con `jwtService.signAsync` | `src/modules/auth/auth.service.ts` |
+| Proteger una ruta: `JwtAuthGuard` lee el encabezado `Authorization`, verifica el token con `jwtService.verifyAsync` y guarda el usuario en la petición (401 si falta o no es válido) | `src/modules/auth/guards/jwt-auth.guard.ts` |
+| Pedir un rol: `@Roles('admin')` marca la ruta y `RolesGuard` compara con el rol del token (403 si no coincide). `@SoloAdministrador()` junta los dos guards y el rol en un solo decorador | `src/modules/auth/guards/roles.guard.ts`, `src/modules/auth/decorators/` |
+| Leer el usuario del token en un controlador: `@UsuarioActual()` | `src/modules/auth/decorators/usuario-actual.decorator.ts` |
 
 ### Usuarios
 
@@ -557,7 +634,7 @@ El cuerpo del `POST` es solo lo que se compra:
 }
 ```
 
-El usuario sale del token y los precios, de la base: si el cuerpo trae `usuarioId`, `estado` o un precio, se ignora. La respuesta es la orden con su detalle:
+El usuario sale del token y los precios, de la base: si el cuerpo trae `usuarioId`, `estado` o un precio, la API responde 400. La respuesta es la orden con su detalle:
 
 ```json
 {

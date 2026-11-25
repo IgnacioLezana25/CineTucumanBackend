@@ -5,7 +5,8 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/modules/app/app.module.js';
 import { PrismaService } from './../src/modules/prisma/prisma.service.js';
-import { cifrarContrasena } from './../src/modules/users/contrasena.util.js';
+import { errorDePrisma } from './error-de-prisma.js';
+import * as bcrypt from 'bcrypt';
 
 const cliente = {
   id: 7,
@@ -38,7 +39,13 @@ describe('Users (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe());
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
     await app.init();
 
     const jwt = app.get(JwtService);
@@ -88,9 +95,9 @@ describe('Users (e2e)', () => {
 
     expect(respuesta.body).toHaveLength(1);
     expect(JSON.stringify(respuesta.body)).not.toContain('contrasena');
-    expect(
-      usuario.findMany.mock.calls[0][0].select.contrasenaHash,
-    ).toBeUndefined();
+    expect(usuario.findMany.mock.calls[0][0].omit).toEqual({
+      contrasenaHash: true,
+    });
   });
 
   it('GET /users/:id lo ve su dueño o un administrador, y otro cliente recibe 403', async () => {
@@ -124,6 +131,7 @@ describe('Users (e2e)', () => {
   });
 
   it('PATCH /users/:id deja a un cliente cambiar su nombre pero no su rol', async () => {
+    usuario.findUnique.mockResolvedValue(cliente);
     usuario.update.mockResolvedValue({ ...cliente, nombre: 'Anita' });
 
     await request(app.getHttpServer())
@@ -149,7 +157,7 @@ describe('Users (e2e)', () => {
   it('PATCH /users/:id pide la contraseña actual a un cliente que cambia la suya', async () => {
     usuario.findUnique.mockResolvedValue({
       ...cliente,
-      contrasenaHash: await cifrarContrasena('Clave12345'),
+      contrasenaHash: await bcrypt.hash('Clave12345', 10),
     });
     usuario.update.mockResolvedValue(cliente);
 
@@ -177,6 +185,7 @@ describe('Users (e2e)', () => {
   });
 
   it('PATCH /users/:id deja al administrador cambiar el rol y la contraseña sin la actual', async () => {
+    usuario.findUnique.mockResolvedValue(cliente);
     usuario.update.mockResolvedValue({ ...cliente, rol: 'admin' });
 
     await request(app.getHttpServer())
@@ -186,11 +195,14 @@ describe('Users (e2e)', () => {
       .expect(200);
 
     expect(usuario.update.mock.calls[0][0].data.rol).toBe('admin');
-    expect(usuario.findUnique).not.toHaveBeenCalled();
+    expect(usuario.findUnique).toHaveBeenCalledTimes(1);
+    expect(usuario.findUnique.mock.calls[0][0].omit).toEqual({
+      contrasenaHash: true,
+    });
   });
 
   it('PATCH /users/:id con datos inválidos responde 400 y con un usuario inexistente 404', async () => {
-    usuario.update.mockRejectedValue({ code: 'P2025' });
+    usuario.findUnique.mockResolvedValue(null);
 
     await request(app.getHttpServer())
       .patch('/users/7')
@@ -205,9 +217,11 @@ describe('Users (e2e)', () => {
   });
 
   it('DELETE /users/:id es solo del administrador y responde 409 si el usuario tiene órdenes', async () => {
-    usuario.delete.mockRejectedValueOnce({ code: 'P2003' });
+    usuario.findUnique.mockImplementation(({ where }) =>
+      Promise.resolve(where.id === 7 ? cliente : null),
+    );
+    usuario.delete.mockRejectedValueOnce(errorDePrisma('P2003'));
     usuario.delete.mockResolvedValueOnce(cliente);
-    usuario.delete.mockRejectedValueOnce({ code: 'P2025' });
 
     await request(app.getHttpServer())
       .delete('/users/7')
@@ -226,6 +240,6 @@ describe('Users (e2e)', () => {
       .set('Authorization', `Bearer ${tokenAdmin}`)
       .expect(404);
 
-    expect(usuario.delete).toHaveBeenCalledTimes(3);
+    expect(usuario.delete).toHaveBeenCalledTimes(2);
   });
 });

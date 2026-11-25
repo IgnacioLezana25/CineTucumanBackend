@@ -5,7 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Rol, SolicitudAutenticada } from '../auth.types.js';
+import { SolicitudAutenticada } from '../auth.types.js';
 import { CLAVE_DE_ROLES } from '../decorators/roles.decorator.js';
 
 @Injectable()
@@ -13,20 +13,23 @@ export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(contexto: ExecutionContext): boolean {
-    const rolesPermitidos = this.reflector.getAllAndOverride<Rol[] | undefined>(
+    const rolesPermitidos = this.reflector.get<string[]>(
       CLAVE_DE_ROLES,
-      [contexto.getHandler(), contexto.getClass()],
+      contexto.getHandler(),
     );
 
-    if (!rolesPermitidos || rolesPermitidos.length === 0) {
+    if (!rolesPermitidos) {
       return true;
     }
 
-    const usuario = contexto
+    const solicitud = contexto
       .switchToHttp()
-      .getRequest<SolicitudAutenticada>().usuario;
+      .getRequest<SolicitudAutenticada>();
 
-    if (!usuario || !rolesPermitidos.includes(usuario.rol)) {
+    if (
+      !solicitud.usuario ||
+      !rolesPermitidos.includes(solicitud.usuario.rol)
+    ) {
       throw new ForbiddenException('No tenés permiso para hacer esto.');
     }
 

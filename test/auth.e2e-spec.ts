@@ -5,7 +5,8 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/modules/app/app.module.js';
 import { PrismaService } from './../src/modules/prisma/prisma.service.js';
-import { cifrarContrasena } from './../src/modules/users/contrasena.util.js';
+import { errorDePrisma } from './error-de-prisma.js';
+import * as bcrypt from 'bcrypt';
 
 const usuarioEnBase = {
   id: 7,
@@ -46,7 +47,13 @@ describe('Auth (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe());
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
     await app.init();
     jwt = app.get(JwtService);
   });
@@ -64,7 +71,6 @@ describe('Auth (e2e)', () => {
         ...cuerpoDeRegistro,
         nombre: ' Ana ',
         correo: 'Ana.Perez@Test.com',
-        rol: 'admin',
       })
       .expect(201);
 
@@ -84,6 +90,15 @@ describe('Auth (e2e)', () => {
       correo: 'ana.perez@test.com',
       rol: 'cliente',
     });
+  });
+
+  it('POST /auth/register rechaza con 400 a quien intenta elegir su rol', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ ...cuerpoDeRegistro, rol: 'admin' })
+      .expect(400);
+
+    expect(usuario.create).not.toHaveBeenCalled();
   });
 
   it('POST /auth/register con datos inválidos responde 400 y no toca la base', async () => {
@@ -106,7 +121,7 @@ describe('Auth (e2e)', () => {
   });
 
   it('POST /auth/register con un correo repetido responde 409', async () => {
-    usuario.create.mockRejectedValue({ code: 'P2002' });
+    usuario.create.mockRejectedValue(errorDePrisma('P2002'));
 
     await request(app.getHttpServer())
       .post('/auth/register')
@@ -115,10 +130,11 @@ describe('Auth (e2e)', () => {
   });
 
   it('POST /auth/login con las credenciales correctas devuelve el token', async () => {
-    usuario.findUnique.mockResolvedValue({
+    usuario.findUnique.mockResolvedValueOnce({
       ...usuarioEnBase,
-      contrasenaHash: await cifrarContrasena('Clave12345'),
+      contrasenaHash: await bcrypt.hash('Clave12345', 10),
     });
+    usuario.findUnique.mockResolvedValueOnce(usuarioEnBase);
 
     const respuesta = await request(app.getHttpServer())
       .post('/auth/login')
@@ -127,6 +143,9 @@ describe('Auth (e2e)', () => {
 
     expect(usuario.findUnique.mock.calls[0][0].where).toEqual({
       correo: 'ana.perez@test.com',
+    });
+    expect(usuario.findUnique.mock.calls[1][0].omit).toEqual({
+      contrasenaHash: true,
     });
     expect(respuesta.body.usuario).toMatchObject({
       id: 7,
@@ -139,7 +158,7 @@ describe('Auth (e2e)', () => {
   it('POST /auth/login con contraseña equivocada o correo inexistente responde 401 con el mismo mensaje', async () => {
     usuario.findUnique.mockResolvedValueOnce({
       ...usuarioEnBase,
-      contrasenaHash: await cifrarContrasena('Clave12345'),
+      contrasenaHash: await bcrypt.hash('Clave12345', 10),
     });
     usuario.findUnique.mockResolvedValueOnce(null);
 

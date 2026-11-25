@@ -18,14 +18,9 @@ export class CatalogosService {
     return this.prisma.ciudad.findMany({ orderBy: { nombre: 'asc' } });
   }
 
-  async salas(filtros: FiltrarSalasDto = {}) {
+  async salas(filtros: FiltrarSalasDto) {
     const salas = await this.prisma.sala.findMany({
-      where: {
-        sucursalId:
-          filtros.sucursalId === undefined
-            ? undefined
-            : Number(filtros.sucursalId),
-      },
+      where: { sucursalId: filtros.sucursalId },
       include: {
         sucursal: { select: { nombre: true } },
         _count: { select: { butacas: true } },

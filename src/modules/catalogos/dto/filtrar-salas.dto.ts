@@ -1,9 +1,10 @@
-import { IsOptional, Matches } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, IsPositive } from 'class-validator';
 
 export class FiltrarSalasDto {
   @IsOptional()
-  @Matches(/^[1-9]\d*$/, {
-    message: 'sucursalId debe ser un número entero positivo',
-  })
-  sucursalId?: string;
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  sucursalId?: number;
 }

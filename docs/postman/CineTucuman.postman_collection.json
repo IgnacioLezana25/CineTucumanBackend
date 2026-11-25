@@ -1105,7 +1105,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Cliente\",\n  \"apellido\": \"De Prueba\",\n  \"correo\": \"{{correoPrueba}}\",\n  \"contrasena\": \"Clave12345\",\n  \"rol\": \"admin\"\n}",
+              "raw": "{\n  \"nombre\": \"Cliente\",\n  \"apellido\": \"De Prueba\",\n  \"correo\": \"{{correoPrueba}}\",\n  \"contrasena\": \"Clave12345\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1139,6 +1139,54 @@
                   "  pm.expect(JSON.stringify(sesion)).to.not.include(\"contrasena\");",
                   "  pm.collectionVariables.set(\"tokenCliente\", sesion.access_token);",
                   "  pm.collectionVariables.set(\"registradoId\", sesion.usuario.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: registrarse eligiendo el rol (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Cliente\",\n  \"apellido\": \"De Prueba\",\n  \"correo\": \"rol@cinetucuman.test\",\n  \"contrasena\": \"Clave12345\",\n  \"rol\": \"admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Avisa que rol no se puede enviar\", function () {",
+                  "  pm.expect(pm.response.json().message).to.include(\"property rol should not exist\");",
                   "});"
                 ]
               }
@@ -1308,7 +1356,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Cliente\",\n  \"apellido\": \"De Prueba\",\n  \"correo\": \"{{correoPrueba}}\",\n  \"contrasena\": \"Clave12345\",\n  \"rol\": \"admin\"\n}",
+              "raw": "{\n  \"nombre\": \"Cliente\",\n  \"apellido\": \"De Prueba\",\n  \"correo\": \"{{correoPrueba}}\",\n  \"contrasena\": \"Clave12345\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1353,7 +1401,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Cliente\",\n  \"apellido\": \"De Prueba\",\n  \"correo\": \"corta@cinetucuman.test\",\n  \"contrasena\": \"corta\",\n  \"rol\": \"admin\"\n}",
+              "raw": "{\n  \"nombre\": \"Cliente\",\n  \"apellido\": \"De Prueba\",\n  \"correo\": \"corta@cinetucuman.test\",\n  \"contrasena\": \"corta\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1398,7 +1446,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Cliente\",\n  \"apellido\": \"De Prueba\",\n  \"correo\": \"no-es-un-correo\",\n  \"contrasena\": \"Clave12345\",\n  \"rol\": \"admin\"\n}",
+              "raw": "{\n  \"nombre\": \"Cliente\",\n  \"apellido\": \"De Prueba\",\n  \"correo\": \"no-es-un-correo\",\n  \"contrasena\": \"Clave12345\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -5902,6 +5950,57 @@
                   "  const sesion = pm.response.json();",
                   "  pm.expect(sesion.usuario.rol).to.eql(\"cliente\");",
                   "  pm.collectionVariables.set(\"tokenCliente\", sesion.access_token);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Error: crear con un campo que no existe (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAdmin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"producto-con-color\",\n  \"nombre\": \"Producto con color\",\n  \"categoria\": \"snack\",\n  \"precio\": 1000,\n  \"color\": \"rojo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Avisa qué campo sobra\", function () {",
+                  "  pm.expect(pm.response.json().message).to.include(\"property color should not exist\");",
                   "});"
                 ]
               }

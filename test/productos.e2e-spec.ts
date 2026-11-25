@@ -5,6 +5,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/modules/app/app.module.js';
 import { PrismaService } from './../src/modules/prisma/prisma.service.js';
+import { errorDePrisma } from './error-de-prisma.js';
 
 const productoEnBase = {
   id: 1,
@@ -45,7 +46,13 @@ describe('Productos (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe());
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
     await app.init();
 
     tokenAdmin = await app.get(JwtService).signAsync({
@@ -99,7 +106,7 @@ describe('Productos (e2e)', () => {
       .expect(201);
 
     expect(respuesta.body.slug).toBe('combo-clasico');
-    expect(producto.create.mock.calls[0][0].data.descripcion).toBeNull();
+    expect(producto.create.mock.calls[0][0].data.descripcion).toBeUndefined();
   });
 
   it('POST /productos con datos inválidos responde 400 y no toca la base', async () => {
@@ -123,7 +130,7 @@ describe('Productos (e2e)', () => {
   });
 
   it('POST /productos con slug repetido responde 409', async () => {
-    producto.create.mockRejectedValue({ code: 'P2002' });
+    producto.create.mockRejectedValue(errorDePrisma('P2002'));
 
     await request(app.getHttpServer())
       .post('/productos')
@@ -133,6 +140,7 @@ describe('Productos (e2e)', () => {
   });
 
   it('PATCH /productos/:id no modifica un campo obligatorio enviado como null', async () => {
+    producto.findUnique.mockResolvedValue(productoEnBase);
     producto.update.mockResolvedValue(productoEnBase);
 
     await request(app.getHttpServer())
@@ -148,7 +156,7 @@ describe('Productos (e2e)', () => {
   });
 
   it('PATCH /productos/:id inexistente responde 404', async () => {
-    producto.update.mockRejectedValue({ code: 'P2025' });
+    producto.findUnique.mockResolvedValue(null);
 
     await request(app.getHttpServer())
       .patch('/productos/99')
@@ -158,7 +166,8 @@ describe('Productos (e2e)', () => {
   });
 
   it('DELETE /productos/:id que figura en órdenes responde 409', async () => {
-    producto.delete.mockRejectedValueOnce({ code: 'P2003' });
+    producto.findUnique.mockResolvedValue(productoEnBase);
+    producto.delete.mockRejectedValueOnce(errorDePrisma('P2003'));
     producto.delete.mockResolvedValueOnce(productoEnBase);
 
     await request(app.getHttpServer())

@@ -5,6 +5,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/modules/app/app.module.js';
 import { PrismaService } from './../src/modules/prisma/prisma.service.js';
+import { errorDePrisma } from './error-de-prisma.js';
 
 const sucursalEnBase = {
   id: 4,
@@ -42,6 +43,7 @@ describe('Sucursales (e2e)', () => {
 
   beforeEach(async () => {
     vi.resetAllMocks();
+    sucursal.findUnique.mockResolvedValue(sucursalEnBase);
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -51,7 +53,13 @@ describe('Sucursales (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe());
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
     await app.init();
 
     tokenAdmin = await app.get(JwtService).signAsync({
@@ -140,12 +148,12 @@ describe('Sucursales (e2e)', () => {
     expect(datos.enlaces).toEqual({
       create: [{ tipo: 'sitio', url: 'https://www.cinesunstar.com/' }],
     });
-    expect(datos.descripcion).toBeNull();
+    expect(datos.descripcion).toBeUndefined();
   });
 
   it('POST /sucursales con slug repetido responde 409 y con ciudad inexistente 400', async () => {
-    sucursal.create.mockRejectedValueOnce({ code: 'P2002' });
-    sucursal.create.mockRejectedValueOnce({ code: 'P2003' });
+    sucursal.create.mockRejectedValueOnce(errorDePrisma('P2002'));
+    sucursal.create.mockRejectedValueOnce(errorDePrisma('P2003'));
 
     await request(app.getHttpServer())
       .post('/sucursales')
@@ -175,7 +183,7 @@ describe('Sucursales (e2e)', () => {
   });
 
   it('PATCH /sucursales/:id inexistente responde 404', async () => {
-    sucursal.update.mockRejectedValue({ code: 'P2025' });
+    sucursal.findUnique.mockResolvedValue(null);
 
     await request(app.getHttpServer())
       .patch('/sucursales/99')
@@ -185,7 +193,7 @@ describe('Sucursales (e2e)', () => {
   });
 
   it('DELETE /sucursales/:id con funciones responde 409 y sin ellas devuelve la sucursal', async () => {
-    sucursal.delete.mockRejectedValueOnce({ code: 'P2003' });
+    sucursal.delete.mockRejectedValueOnce(errorDePrisma('P2003'));
     sucursal.delete.mockResolvedValueOnce(sucursalEnBase);
 
     await request(app.getHttpServer())
