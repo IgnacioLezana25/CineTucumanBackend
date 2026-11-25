@@ -1,15 +1,12 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { contrasenaCoincide } from '../users/contrasena.util.js';
+import * as bcrypt from 'bcrypt';
 import { Usuario } from '../users/entities/usuario.entity.js';
 import { UsersService } from '../users/users.service.js';
-import { PayloadJwt, Rol } from './auth.types.js';
+import { PayloadJwt } from './auth.types.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { Sesion } from './entities/sesion.entity.js';
-
-const HASH_FICTICIO =
-  '$2b$10$eZwWvBF8iGeBj7Tisaldh.VdYYzrewM7io2BFj0zqAqLzqS0lHDve';
 
 @Injectable()
 export class AuthService {
@@ -18,32 +15,29 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async register(datos: RegisterDto): Promise<Sesion> {
-    const usuario = await this.usersService.crearCliente(datos);
+  async register(registerDto: RegisterDto): Promise<Sesion> {
+    const usuario = await this.usersService.crearCliente(registerDto);
 
     return this.crearSesion(usuario);
   }
 
-  async login({ correo, contrasena }: LoginDto): Promise<Sesion> {
-    const usuario =
-      await this.usersService.buscarConContrasenaPorCorreo(correo);
-    const coincide = await contrasenaCoincide(
-      contrasena,
-      usuario?.contrasenaHash ?? HASH_FICTICIO,
-    );
+  async login(loginDto: LoginDto): Promise<Sesion> {
+    const usuario = await this.usersService.buscarPorCorreo(loginDto.correo);
 
-    if (!usuario || !coincide) {
+    if (!usuario) {
       throw new UnauthorizedException('Correo o contraseña incorrectos.');
     }
 
-    return this.crearSesion({
-      id: usuario.id,
-      nombre: usuario.nombre,
-      apellido: usuario.apellido,
-      correo: usuario.correo,
-      rol: usuario.rol as Rol,
-      creadoEn: usuario.creadoEn,
-    });
+    const coincide = await bcrypt.compare(
+      loginDto.contrasena,
+      usuario.contrasenaHash,
+    );
+
+    if (!coincide) {
+      throw new UnauthorizedException('Correo o contraseña incorrectos.');
+    }
+
+    return this.crearSesion(await this.usersService.buscar(usuario.id));
   }
 
   perfil(id: number): Promise<Usuario> {
