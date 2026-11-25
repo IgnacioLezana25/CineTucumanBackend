@@ -5,6 +5,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/modules/app/app.module.js';
 import { PrismaService } from './../src/modules/prisma/prisma.service.js';
+import { errorDePrisma } from './error-de-prisma.js';
 
 const manana = new Date(Date.now() + 24 * 60 * 60 * 1000);
 const ayer = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -66,9 +67,9 @@ describe('Ordenes (e2e)', () => {
       findUnique: vi.fn(),
       update: vi.fn(),
     },
-    funcion: { findMany: vi.fn() },
-    butaca: { findMany: vi.fn() },
-    producto: { findMany: vi.fn() },
+    funcion: { findUnique: vi.fn() },
+    butaca: { findUnique: vi.fn() },
+    producto: { findUnique: vi.fn() },
     entrada: { deleteMany: vi.fn() },
     ordenProducto: { deleteMany: vi.fn() },
     $transaction: vi.fn(),
@@ -135,9 +136,9 @@ describe('Ordenes (e2e)', () => {
   });
 
   it('POST /ordenes crea la orden del usuario del token con los precios del servidor', async () => {
-    prisma.funcion.findMany.mockResolvedValue([funcion]);
-    prisma.butaca.findMany.mockResolvedValue([butaca(103)]);
-    prisma.producto.findMany.mockResolvedValue([producto]);
+    prisma.funcion.findUnique.mockResolvedValue(funcion);
+    prisma.butaca.findUnique.mockResolvedValue(butaca(103));
+    prisma.producto.findUnique.mockResolvedValue(producto);
     prisma.orden.create.mockResolvedValue(ordenEnBase());
 
     const respuesta = await comprar({
@@ -197,9 +198,9 @@ describe('Ordenes (e2e)', () => {
   });
 
   it('POST /ordenes puede ser solo de Candy Bar o solo de entradas', async () => {
-    prisma.funcion.findMany.mockResolvedValue([funcion]);
-    prisma.butaca.findMany.mockResolvedValue([butaca(103)]);
-    prisma.producto.findMany.mockResolvedValue([producto]);
+    prisma.funcion.findUnique.mockResolvedValue(funcion);
+    prisma.butaca.findUnique.mockResolvedValue(butaca(103));
+    prisma.producto.findUnique.mockResolvedValue(producto);
     prisma.orden.create.mockResolvedValue(ordenEnBase());
 
     await comprar({ productos: [{ productoId: 1, cantidad: 1 }] }).expect(201);
@@ -211,6 +212,31 @@ describe('Ordenes (e2e)', () => {
     expect(prisma.orden.create.mock.calls[1][0].data.productos.create).toEqual(
       [],
     );
+  });
+
+  it('POST /ordenes redondea los subtotales y el total a centavos', async () => {
+    prisma.producto.findUnique.mockResolvedValue(producto);
+    prisma.orden.create.mockResolvedValue(
+      ordenEnBase({
+        entradas: [],
+        productos: [
+          {
+            ordenId: 20,
+            productoId: 1,
+            cantidad: 3,
+            precioUnitario: '1234.55',
+            producto: { nombre: 'Combo Clásico' },
+          },
+        ],
+      }),
+    );
+
+    const respuesta = await comprar({
+      productos: [{ productoId: 1, cantidad: 3 }],
+    }).expect(201);
+
+    expect(respuesta.body.productos[0].subtotal).toBe(3703.65);
+    expect(respuesta.body.total).toBe(3703.65);
   });
 
   it('POST /ordenes sin entradas ni productos responde 400', async () => {
@@ -250,21 +276,23 @@ describe('Ordenes (e2e)', () => {
       await comprar(cuerpo).expect(400);
     }
 
-    expect(prisma.funcion.findMany).not.toHaveBeenCalled();
+    expect(prisma.funcion.findUnique).not.toHaveBeenCalled();
     expect(prisma.orden.create).not.toHaveBeenCalled();
   });
 
   it('POST /ordenes rechaza funciones inexistentes o ya empezadas, butacas de otra sala y productos inactivos', async () => {
-    prisma.butaca.findMany.mockResolvedValue([butaca(103)]);
-    prisma.funcion.findMany.mockResolvedValueOnce([]);
-    prisma.funcion.findMany.mockResolvedValueOnce([
-      { ...funcion, iniciaEn: ayer },
-    ]);
-    prisma.funcion.findMany.mockResolvedValueOnce([{ ...funcion, salaId: 4 }]);
-    prisma.producto.findMany.mockResolvedValueOnce([]);
-    prisma.producto.findMany.mockResolvedValueOnce([
-      { ...producto, activo: false },
-    ]);
+    prisma.butaca.findUnique.mockResolvedValue(butaca(103));
+    prisma.funcion.findUnique.mockResolvedValueOnce(null);
+    prisma.funcion.findUnique.mockResolvedValueOnce({
+      ...funcion,
+      iniciaEn: ayer,
+    });
+    prisma.funcion.findUnique.mockResolvedValueOnce({ ...funcion, salaId: 4 });
+    prisma.producto.findUnique.mockResolvedValueOnce(null);
+    prisma.producto.findUnique.mockResolvedValueOnce({
+      ...producto,
+      activo: false,
+    });
 
     const entradas = [{ funcionId: 10, butacaId: 103 }];
     const productos = [{ productoId: 1, cantidad: 1 }];
@@ -279,50 +307,20 @@ describe('Ordenes (e2e)', () => {
   });
 
   it('POST /ordenes con una butaca inexistente responde 400', async () => {
-    prisma.funcion.findMany.mockResolvedValue([funcion]);
-    prisma.butaca.findMany.mockResolvedValue([]);
+    prisma.funcion.findUnique.mockResolvedValue(funcion);
+    prisma.butaca.findUnique.mockResolvedValue(null);
 
     await comprar({ entradas: [{ funcionId: 10, butacaId: 103 }] }).expect(400);
   });
 
   it('POST /ordenes con una butaca ya vendida responde 409', async () => {
-    prisma.funcion.findMany.mockResolvedValue([funcion]);
-    prisma.butaca.findMany.mockResolvedValue([butaca(103)]);
-    prisma.orden.create.mockRejectedValue({
-      code: 'P2002',
-      meta: {
-        driverAdapterError: {
-          cause: { constraint: { index: 'entradas_funcion_butaca_key' } },
-        },
-      },
-    });
+    prisma.funcion.findUnique.mockResolvedValue(funcion);
+    prisma.butaca.findUnique.mockResolvedValue(butaca(103));
+    prisma.orden.create.mockRejectedValue(errorDePrisma('P2002'));
 
     await comprar({ entradas: [{ funcionId: 10, butacaId: 103 }] }).expect(409);
 
     expect(prisma.orden.create).toHaveBeenCalledTimes(1);
-  });
-
-  it('POST /ordenes reintenta con otro número si el número ya existe', async () => {
-    prisma.funcion.findMany.mockResolvedValue([funcion]);
-    prisma.butaca.findMany.mockResolvedValue([butaca(103)]);
-    prisma.orden.create.mockRejectedValueOnce({
-      code: 'P2002',
-      meta: {
-        driverAdapterError: {
-          cause: { constraint: { index: 'ordenes_numero_key' } },
-        },
-      },
-    });
-    prisma.orden.create.mockResolvedValueOnce(ordenEnBase());
-
-    await comprar({ entradas: [{ funcionId: 10, butacaId: 103 }] }).expect(201);
-
-    const [primero, segundo] = prisma.orden.create.mock.calls.map(
-      (llamada) => llamada[0].data.numero,
-    );
-
-    expect(prisma.orden.create).toHaveBeenCalledTimes(2);
-    expect(primero).not.toBe(segundo);
   });
 
   it('GET /ordenes devuelve a un cliente solo sus órdenes', async () => {
@@ -401,10 +399,11 @@ describe('Ordenes (e2e)', () => {
   });
 
   it('PATCH /ordenes/:id/cancelar libera las butacas y deja la orden sin total', async () => {
-    prisma.orden.findUnique.mockResolvedValue(ordenEnBase());
-    prisma.orden.update.mockResolvedValue(
+    prisma.orden.findUnique.mockResolvedValueOnce(ordenEnBase());
+    prisma.orden.findUnique.mockResolvedValueOnce(
       ordenEnBase({ estado: 'cancelada', entradas: [], productos: [] }),
     );
+    prisma.orden.update.mockResolvedValue({});
 
     const respuesta = await request(app.getHttpServer())
       .patch('/ordenes/20/cancelar')

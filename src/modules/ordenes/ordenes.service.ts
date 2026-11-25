@@ -9,17 +9,12 @@ import { Prisma } from '../../generated/prisma/client.js';
 import { UsuarioAutenticado } from '../auth/auth.types.js';
 import { fechaLocal, horarioLocal } from '../comunes/horario-local.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import {
-  PRISMA_CLAVE_UNICA,
-  PRISMA_NO_ENCONTRADO,
-  codigoDeError,
-} from '../prisma/prisma-error.util.js';
 import { CreateOrdenDto } from './dto/create-orden.dto.js';
+import { EntradaOrdenDto } from './dto/entrada-orden.dto.js';
 import { FiltrarOrdenesDto } from './dto/filtrar-ordenes.dto.js';
+import { ProductoOrdenDto } from './dto/producto-orden.dto.js';
 import { Orden } from './entities/orden.entity.js';
 import { generarNumeroDeOrden } from './numero-orden.util.js';
-
-const INTENTOS_DE_NUMERO = 3;
 
 const INCLUIR_DETALLE = {
   entradas: {
@@ -46,6 +41,18 @@ type OrdenConDetalle = Prisma.OrdenGetPayload<{
   include: typeof INCLUIR_DETALLE;
 }>;
 
+interface EntradaAGuardar {
+  funcionId: number;
+  butacaId: number;
+  precioUnitario: number;
+}
+
+interface ProductoAGuardar {
+  productoId: number;
+  cantidad: number;
+  precioUnitario: number;
+}
+
 @Injectable()
 export class OrdenesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -63,52 +70,39 @@ export class OrdenesService {
       );
     }
 
-    const preciosDeEntradas = await this.validarEntradas(entradas);
-    const preciosDeProductos = await this.validarProductos(productos);
+    const entradasAGuardar = await this.prepararEntradas(entradas);
+    const productosAGuardar = await this.prepararProductos(productos);
 
-    for (let intento = 1; ; intento++) {
-      try {
-        const orden = await this.prisma.orden.create({
-          data: {
-            numero: generarNumeroDeOrden(),
-            usuarioId: comprador.id,
-            estado: 'pagada',
-            entradas: {
-              create: entradas.map((entrada) => ({
-                funcionId: entrada.funcionId,
-                butacaId: entrada.butacaId,
-                precioUnitario: preciosDeEntradas.get(entrada.funcionId)!,
-              })),
-            },
-            productos: {
-              create: productos.map((producto) => ({
-                productoId: producto.productoId,
-                cantidad: producto.cantidad,
-                precioUnitario: preciosDeProductos.get(producto.productoId)!,
-              })),
-            },
-          },
-          include: INCLUIR_DETALLE,
-        });
+    try {
+      const orden = await this.prisma.orden.create({
+        data: {
+          numero: generarNumeroDeOrden(),
+          usuarioId: comprador.id,
+          estado: 'pagada',
+          entradas: { create: entradasAGuardar },
+          productos: { create: productosAGuardar },
+        },
+        include: INCLUIR_DETALLE,
+      });
 
-        return this.presentar(orden);
-      } catch (error) {
-        if (codigoDeError(error) !== PRISMA_CLAVE_UNICA) {
-          throw error;
-        }
-
-        if (!this.esConflictoDeNumero(error) || intento >= INTENTOS_DE_NUMERO) {
-          throw new ConflictException(
-            'Alguna de las butacas ya fue vendida. Elegí otras y volvé a intentar.',
-          );
-        }
+      return this.presentar(orden);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'Alguna de las butacas ya fue vendida. Elegí otras y volvé a intentar.',
+        );
       }
+
+      throw error;
     }
   }
 
   async findAll(
     solicitante: UsuarioAutenticado,
-    filtros: FiltrarOrdenesDto = {},
+    filtros: FiltrarOrdenesDto,
   ): Promise<Orden[]> {
     const esAdmin = solicitante.rol === 'admin';
 
@@ -133,7 +127,9 @@ export class OrdenesService {
   }
 
   async findOne(id: number, solicitante: UsuarioAutenticado): Promise<Orden> {
-    return this.presentar(await this.buscar(id, solicitante));
+    const orden = await this.buscar(id, solicitante);
+
+    return this.presentar(orden);
   }
 
   async cancelar(id: number, solicitante: UsuarioAutenticado): Promise<Orden> {
@@ -144,32 +140,26 @@ export class OrdenesService {
     }
 
     const ahora = new Date();
+    const yaEmpezoAlguna = orden.entradas.some(
+      (entrada) => entrada.funcion.iniciaEn <= ahora,
+    );
 
-    if (orden.entradas.some((entrada) => entrada.funcion.iniciaEn <= ahora)) {
+    if (yaEmpezoAlguna) {
       throw new ConflictException(
         'No se puede cancelar la orden porque una de sus funciones ya empezó.',
       );
     }
 
-    try {
-      const [, , cancelada] = await this.prisma.$transaction([
-        this.prisma.entrada.deleteMany({ where: { ordenId: id } }),
-        this.prisma.ordenProducto.deleteMany({ where: { ordenId: id } }),
-        this.prisma.orden.update({
-          where: { id },
-          data: { estado: 'cancelada' },
-          include: INCLUIR_DETALLE,
-        }),
-      ]);
+    await this.prisma.$transaction([
+      this.prisma.entrada.deleteMany({ where: { ordenId: id } }),
+      this.prisma.ordenProducto.deleteMany({ where: { ordenId: id } }),
+      this.prisma.orden.update({
+        where: { id },
+        data: { estado: 'cancelada' },
+      }),
+    ]);
 
-      return this.presentar(cancelada);
-    } catch (error) {
-      if (codigoDeError(error) === PRISMA_NO_ENCONTRADO) {
-        throw new NotFoundException(`No existe una orden con id ${id}.`);
-      }
-
-      throw error;
-    }
+    return this.findOne(id, solicitante);
   }
 
   private async buscar(
@@ -194,107 +184,117 @@ export class OrdenesService {
     return orden;
   }
 
-  private async validarEntradas(
-    entradas: NonNullable<CreateOrdenDto['entradas']>,
-  ): Promise<Map<number, Prisma.Decimal>> {
-    const precios = new Map<number, Prisma.Decimal>();
+  private async prepararEntradas(
+    entradas: EntradaOrdenDto[],
+  ): Promise<EntradaAGuardar[]> {
+    const resultado: EntradaAGuardar[] = [];
 
-    if (entradas.length === 0) {
-      return precios;
-    }
-
-    const funcionIds = [...new Set(entradas.map((e) => e.funcionId))];
-    const butacaIds = [...new Set(entradas.map((e) => e.butacaId))];
-    const [funciones, butacas] = await Promise.all([
-      this.prisma.funcion.findMany({ where: { id: { in: funcionIds } } }),
-      this.prisma.butaca.findMany({ where: { id: { in: butacaIds } } }),
-    ]);
-    const funcionPorId = new Map(funciones.map((f) => [f.id, f]));
-    const butacaPorId = new Map(butacas.map((b) => [b.id, b]));
-    const ahora = new Date();
-
-    for (const { funcionId, butacaId } of entradas) {
-      const funcion = funcionPorId.get(funcionId);
-      const butaca = butacaPorId.get(butacaId);
+    for (const entrada of entradas) {
+      const funcion = await this.prisma.funcion.findUnique({
+        where: { id: entrada.funcionId },
+      });
 
       if (!funcion) {
-        throw new BadRequestException(`La función ${funcionId} no existe.`);
+        throw new BadRequestException(
+          `La función ${entrada.funcionId} no existe.`,
+        );
       }
 
-      if (funcion.iniciaEn <= ahora) {
-        throw new BadRequestException(`La función ${funcionId} ya empezó.`);
+      if (funcion.iniciaEn <= new Date()) {
+        throw new BadRequestException(
+          `La función ${entrada.funcionId} ya empezó.`,
+        );
       }
+
+      const butaca = await this.prisma.butaca.findUnique({
+        where: { id: entrada.butacaId },
+      });
 
       if (!butaca) {
-        throw new BadRequestException(`La butaca ${butacaId} no existe.`);
+        throw new BadRequestException(
+          `La butaca ${entrada.butacaId} no existe.`,
+        );
       }
 
       if (butaca.salaId !== funcion.salaId) {
         throw new BadRequestException(
-          `La butaca ${butacaId} no es de la sala de la función ${funcionId}.`,
+          `La butaca ${entrada.butacaId} no es de la sala de la función ${entrada.funcionId}.`,
         );
       }
 
-      precios.set(funcionId, new Prisma.Decimal(funcion.precio));
+      resultado.push({
+        funcionId: entrada.funcionId,
+        butacaId: entrada.butacaId,
+        precioUnitario: Number(funcion.precio),
+      });
     }
 
-    return precios;
+    return resultado;
   }
 
-  private async validarProductos(
-    productos: NonNullable<CreateOrdenDto['productos']>,
-  ): Promise<Map<number, Prisma.Decimal>> {
-    const precios = new Map<number, Prisma.Decimal>();
+  private async prepararProductos(
+    productos: ProductoOrdenDto[],
+  ): Promise<ProductoAGuardar[]> {
+    const resultado: ProductoAGuardar[] = [];
 
-    if (productos.length === 0) {
-      return precios;
-    }
-
-    const encontrados = await this.prisma.producto.findMany({
-      where: { id: { in: productos.map((p) => p.productoId) } },
-    });
-    const productoPorId = new Map(encontrados.map((p) => [p.id, p]));
-
-    for (const { productoId } of productos) {
-      const producto = productoPorId.get(productoId);
+    for (const item of productos) {
+      const producto = await this.prisma.producto.findUnique({
+        where: { id: item.productoId },
+      });
 
       if (!producto) {
-        throw new BadRequestException(`El producto ${productoId} no existe.`);
+        throw new BadRequestException(
+          `El producto ${item.productoId} no existe.`,
+        );
       }
 
       if (!producto.activo) {
         throw new BadRequestException(
-          `El producto ${productoId} ya no está disponible.`,
+          `El producto ${item.productoId} ya no está disponible.`,
         );
       }
 
-      precios.set(productoId, new Prisma.Decimal(producto.precio));
+      resultado.push({
+        productoId: item.productoId,
+        cantidad: item.cantidad,
+        precioUnitario: Number(producto.precio),
+      });
     }
 
-    return precios;
-  }
-
-  private esConflictoDeNumero(error: unknown): boolean {
-    const meta =
-      typeof error === 'object' && error !== null && 'meta' in error
-        ? JSON.stringify(error.meta)
-        : '';
-
-    return meta.includes('ordenes_numero_key');
+    return resultado;
   }
 
   private presentar(orden: OrdenConDetalle): Orden {
-    const totalDeEntradas = orden.entradas.reduce(
-      (suma, entrada) => suma.plus(entrada.precioUnitario),
-      new Prisma.Decimal(0),
-    );
-    const totalDeProductos = orden.productos.reduce(
-      (suma, producto) =>
-        suma.plus(
-          new Prisma.Decimal(producto.precioUnitario).times(producto.cantidad),
-        ),
-      new Prisma.Decimal(0),
-    );
+    const entradas = orden.entradas.map((entrada) => ({
+      id: entrada.id,
+      funcionId: entrada.funcionId,
+      pelicula: entrada.funcion.pelicula.titulo,
+      sucursal: entrada.funcion.sala.sucursal.nombre,
+      sala: entrada.funcion.sala.nombre,
+      iniciaEn: entrada.funcion.iniciaEn.toISOString(),
+      fecha: fechaLocal(entrada.funcion.iniciaEn),
+      horario: horarioLocal(entrada.funcion.iniciaEn),
+      butacaId: entrada.butacaId,
+      butaca: `${entrada.butaca.fila}${entrada.butaca.numero}`,
+      precioUnitario: Number(entrada.precioUnitario),
+    }));
+    const productos = orden.productos.map((item) => ({
+      productoId: item.productoId,
+      nombre: item.producto.nombre,
+      cantidad: item.cantidad,
+      precioUnitario: Number(item.precioUnitario),
+      subtotal: this.redondear(Number(item.precioUnitario) * item.cantidad),
+    }));
+
+    let total = 0;
+
+    for (const entrada of entradas) {
+      total += entrada.precioUnitario;
+    }
+
+    for (const producto of productos) {
+      total += producto.subtotal;
+    }
 
     return {
       id: orden.id,
@@ -302,29 +302,13 @@ export class OrdenesService {
       usuarioId: orden.usuarioId,
       estado: orden.estado,
       creadaEn: orden.creadaEn.toISOString(),
-      entradas: orden.entradas.map((entrada) => ({
-        id: entrada.id,
-        funcionId: entrada.funcionId,
-        pelicula: entrada.funcion.pelicula.titulo,
-        sucursal: entrada.funcion.sala.sucursal.nombre,
-        sala: entrada.funcion.sala.nombre,
-        iniciaEn: entrada.funcion.iniciaEn.toISOString(),
-        fecha: fechaLocal(entrada.funcion.iniciaEn),
-        horario: horarioLocal(entrada.funcion.iniciaEn),
-        butacaId: entrada.butacaId,
-        butaca: `${entrada.butaca.fila}${entrada.butaca.numero}`,
-        precioUnitario: Number(entrada.precioUnitario),
-      })),
-      productos: orden.productos.map((producto) => ({
-        productoId: producto.productoId,
-        nombre: producto.producto.nombre,
-        cantidad: producto.cantidad,
-        precioUnitario: Number(producto.precioUnitario),
-        subtotal: new Prisma.Decimal(producto.precioUnitario)
-          .times(producto.cantidad)
-          .toNumber(),
-      })),
-      total: totalDeEntradas.plus(totalDeProductos).toNumber(),
+      entradas,
+      productos,
+      total: this.redondear(total),
     };
+  }
+
+  private redondear(importe: number): number {
+    return Math.round(importe * 100) / 100;
   }
 }
