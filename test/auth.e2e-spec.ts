@@ -46,7 +46,9 @@ describe('Auth (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe());
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+    );
     await app.init();
     jwt = app.get(JwtService);
   });
@@ -64,7 +66,6 @@ describe('Auth (e2e)', () => {
         ...cuerpoDeRegistro,
         nombre: ' Ana ',
         correo: 'Ana.Perez@Test.com',
-        rol: 'admin',
       })
       .expect(201);
 
@@ -84,6 +85,15 @@ describe('Auth (e2e)', () => {
       correo: 'ana.perez@test.com',
       rol: 'cliente',
     });
+  });
+
+  it('POST /auth/register rechaza con 400 a quien intenta elegir su rol', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ ...cuerpoDeRegistro, rol: 'admin' })
+      .expect(400);
+
+    expect(usuario.create).not.toHaveBeenCalled();
   });
 
   it('POST /auth/register con datos inválidos responde 400 y no toca la base', async () => {

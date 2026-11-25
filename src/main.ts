@@ -26,7 +26,9 @@ async function bootstrap() {
   app.useStaticAssets(carpetaDeSubidas(configuracion), {
     prefix: '/imagenes/',
   });
-  app.useGlobalPipes(new ValidationPipe());
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+  );
   await app.listen(puerto);
   Logger.log(`API escuchando en ${urlBase}`, 'Bootstrap');
 }
